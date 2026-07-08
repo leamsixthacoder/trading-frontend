@@ -1,33 +1,43 @@
 import { useEffect, useState } from 'react'
 import {
-  getAccountBalance,
+  getDashboardSummary,
   getPortfolioBalance,
-  listAccounts,
-  type AccountBalance,
+  getSetupPerformance,
+  listJournalEntries,
+  type DashboardSummary as DashboardSummaryData,
+  type JournalEntry,
+  type PnlBySetup,
   type PortfolioBalance,
 } from './api'
+import { DashboardSummary } from './components/DashboardSummary'
+import { SetupPerformance } from './components/SetupPerformance'
+import { JournalSection } from './components/JournalSection'
 import './App.css'
 
 function App() {
-  const [balances, setBalances] = useState<AccountBalance[]>([])
   const [portfolio, setPortfolio] = useState<PortfolioBalance | null>(null)
+  const [summary, setSummary] = useState<DashboardSummaryData | null>(null)
+  const [setupRows, setSetupRows] = useState<PnlBySetup[]>([])
+  const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       try {
-        const [accounts, portfolioBalance] = await Promise.all([
-          listAccounts(),
-          getPortfolioBalance(),
-        ])
-        const withBalances = await Promise.all(
-          accounts.map((a) => getAccountBalance(a.id)),
-        )
-        setBalances(withBalances)
+        const [portfolioBalance, dashboardSummary, setupPerformance, entries] =
+          await Promise.all([
+            getPortfolioBalance(),
+            getDashboardSummary(),
+            getSetupPerformance(),
+            listJournalEntries(),
+          ])
         setPortfolio(portfolioBalance)
+        setSummary(dashboardSummary)
+        setSetupRows(setupPerformance)
+        setJournalEntries(entries)
       } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to load accounts')
+        setError(e instanceof Error ? e.message : 'Failed to load dashboard')
       } finally {
         setLoading(false)
       }
@@ -35,7 +45,7 @@ function App() {
     load()
   }, [])
 
-  if (loading) return <p>Loading accounts...</p>
+  if (loading) return <p>Loading...</p>
   if (error) return <p>Error: {error}</p>
 
   return (
@@ -90,29 +100,12 @@ function App() {
         </>
       )}
 
-      <h1>Accounts</h1>
-      <table>
-        <thead>
-          <tr>
-            <th>Label</th>
-            <th>Type</th>
-            <th>Status</th>
-            <th>Capital base</th>
-            <th>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          {balances.map((b) => (
-            <tr key={b.account_id}>
-              <td>{b.label}</td>
-              <td>{b.account_type}</td>
-              <td>{b.status}</td>
-              <td>{b.capital_base}</td>
-              <td>{b.current_balance}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {summary && <DashboardSummary summary={summary} />}
+      <SetupPerformance rows={setupRows} />
+      <JournalSection
+        entries={journalEntries}
+        onCreated={(entry) => setJournalEntries((prev) => [entry, ...prev])}
+      />
     </main>
   )
 }

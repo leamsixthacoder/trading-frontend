@@ -151,6 +151,93 @@ export interface HoldingInput {
   asset_class?: string
 }
 
+export interface PayoutRule {
+  id: string
+  account_type: string
+  profit_split_pct: string
+  min_payout_amount: string | null
+  payout_frequency: string | null
+  notes: string | null
+  effective_date: string
+}
+
+export interface PayoutRuleInput {
+  account_type: string
+  profit_split_pct: number
+  min_payout_amount?: number | null
+  payout_frequency?: string | null
+  notes?: string | null
+}
+
+export interface PayoutEligibility {
+  account_id: string
+  checked_at: string
+  eligible: boolean
+  computed_amount: string | null
+  computed_from: Record<string, unknown>
+  reason_if_ineligible: string | null
+}
+
+export interface AggregateRiskRule {
+  id: string
+  rule_type: string
+  scope: string
+  threshold: string
+  active: boolean
+}
+
+export interface AggregateRiskRuleInput {
+  rule_type: string
+  scope: string
+  threshold: number
+}
+
+export interface AggregateRiskBreach {
+  rule_id: string
+  rule_type: string
+  scope: string
+  threshold: string
+  actual: string
+}
+
+export interface AggregateRiskStatus {
+  total_open_risk: string
+  total_daily_pnl: string
+  breaches: AggregateRiskBreach[]
+}
+
+export interface EmotionalStateLog {
+  id: string
+  logged_at: string
+  account_id: string | null
+  state_tags: string[]
+  intensity: number | null
+  note: string | null
+}
+
+export interface EmotionalStateLogInput {
+  account_id?: string | null
+  state_tags?: string[]
+  intensity?: number | null
+  note?: string | null
+}
+
+export interface TradeReview {
+  id: string
+  trade_id: string | null
+  what_happened: string | null
+  what_went_well: string | null
+  what_to_change: string | null
+  created_at: string
+}
+
+export interface TradeReviewInput {
+  trade_id?: string | null
+  what_happened?: string | null
+  what_went_well?: string | null
+  what_to_change?: string | null
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) {
@@ -249,4 +336,44 @@ export function listHoldings(): Promise<Holding[]> {
 
 export function createHolding(holding: HoldingInput): Promise<Holding> {
   return postJson('/holdings', holding)
+}
+
+export function listPayoutRules(): Promise<PayoutRule[]> {
+  return getJson('/payout-rules')
+}
+
+export function createPayoutRule(rule: PayoutRuleInput): Promise<PayoutRule> {
+  return postJson('/payout-rules', rule)
+}
+
+export function checkPayoutEligibility(accountId: string): Promise<PayoutEligibility> {
+  return getJson(`/accounts/${accountId}/payout-eligibility`)
+}
+
+export function listAggregateRiskRules(): Promise<AggregateRiskRule[]> {
+  return getJson('/aggregate-risk-rules')
+}
+
+export function createAggregateRiskRule(rule: AggregateRiskRuleInput): Promise<AggregateRiskRule> {
+  return postJson('/aggregate-risk-rules', rule)
+}
+
+export function getAggregateRiskStatus(): Promise<AggregateRiskStatus> {
+  return getJson('/risk/aggregate-status')
+}
+
+export function listEmotionalStateLogs(): Promise<EmotionalStateLog[]> {
+  return getJson('/emotional-state-logs')
+}
+
+export function createEmotionalStateLog(log: EmotionalStateLogInput): Promise<EmotionalStateLog> {
+  return postJson('/emotional-state-logs', log)
+}
+
+export function listTradeReviews(): Promise<TradeReview[]> {
+  return getJson('/trade-reviews')
+}
+
+export function createTradeReview(review: TradeReviewInput): Promise<TradeReview> {
+  return postJson('/trade-reviews', review)
 }

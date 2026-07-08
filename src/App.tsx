@@ -1,25 +1,38 @@
 import { useEffect, useState } from 'react'
 import {
+  getAggregateRiskStatus,
   getDashboardSummary,
   getPortfolioBalance,
   getSetupPerformance,
   listAccounts,
+  listAggregateRiskRules,
+  listEmotionalStateLogs,
   listHoldings,
   listJournalEntries,
+  listPayoutRules,
   listStrategies,
+  listTradeReviews,
   type Account,
+  type AggregateRiskRule,
+  type AggregateRiskStatus,
   type DashboardSummary as DashboardSummaryData,
+  type EmotionalStateLog,
   type Holding,
   type JournalEntry,
+  type PayoutRule,
   type PnlBySetup,
   type PortfolioBalance,
   type Strategy,
+  type TradeReview,
 } from './api'
 import { DashboardSummary } from './components/DashboardSummary'
 import { SetupPerformance } from './components/SetupPerformance'
 import { JournalSection } from './components/JournalSection'
 import { StrategiesSection } from './components/StrategiesSection'
 import { InvestmentsSection } from './components/InvestmentsSection'
+import { PayoutsSection } from './components/PayoutsSection'
+import { AggregateRiskSection } from './components/AggregateRiskSection'
+import { WellnessSection } from './components/WellnessSection'
 import './App.css'
 
 function App() {
@@ -30,6 +43,11 @@ function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([])
   const [holdings, setHoldings] = useState<Holding[]>([])
   const [accounts, setAccounts] = useState<Account[]>([])
+  const [payoutRules, setPayoutRules] = useState<PayoutRule[]>([])
+  const [aggregateRiskStatus, setAggregateRiskStatus] = useState<AggregateRiskStatus | null>(null)
+  const [aggregateRiskRules, setAggregateRiskRules] = useState<AggregateRiskRule[]>([])
+  const [emotionalStateLogs, setEmotionalStateLogs] = useState<EmotionalStateLog[]>([])
+  const [tradeReviews, setTradeReviews] = useState<TradeReview[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -44,6 +62,11 @@ function App() {
           strategyList,
           holdingList,
           accountList,
+          payoutRuleList,
+          riskStatus,
+          riskRuleList,
+          stateLogList,
+          reviewList,
         ] = await Promise.all([
           getPortfolioBalance(),
           getDashboardSummary(),
@@ -52,6 +75,11 @@ function App() {
           listStrategies(),
           listHoldings(),
           listAccounts(),
+          listPayoutRules(),
+          getAggregateRiskStatus(),
+          listAggregateRiskRules(),
+          listEmotionalStateLogs(),
+          listTradeReviews(),
         ])
         setPortfolio(portfolioBalance)
         setSummary(dashboardSummary)
@@ -60,6 +88,11 @@ function App() {
         setStrategies(strategyList)
         setHoldings(holdingList)
         setAccounts(accountList)
+        setPayoutRules(payoutRuleList)
+        setAggregateRiskStatus(riskStatus)
+        setAggregateRiskRules(riskRuleList)
+        setEmotionalStateLogs(stateLogList)
+        setTradeReviews(reviewList)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load dashboard')
       } finally {
@@ -141,6 +174,22 @@ function App() {
         holdings={holdings}
         portfolioAccounts={accounts.filter((a) => a.account_type === 'personal_portfolio')}
         onCreated={(holding) => setHoldings((prev) => [holding, ...prev])}
+      />
+      <PayoutsSection
+        accounts={accounts}
+        rules={payoutRules}
+        onRuleCreated={(rule) => setPayoutRules((prev) => [rule, ...prev])}
+      />
+      <AggregateRiskSection
+        status={aggregateRiskStatus}
+        rules={aggregateRiskRules}
+        onRuleCreated={(rule) => setAggregateRiskRules((prev) => [rule, ...prev])}
+      />
+      <WellnessSection
+        emotionalStateLogs={emotionalStateLogs}
+        tradeReviews={tradeReviews}
+        onLogCreated={(log) => setEmotionalStateLogs((prev) => [log, ...prev])}
+        onReviewCreated={(review) => setTradeReviews((prev) => [review, ...prev])}
       />
     </main>
   )

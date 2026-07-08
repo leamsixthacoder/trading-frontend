@@ -22,6 +22,28 @@ export interface AccountBalance {
   current_balance: string
 }
 
+export interface PortfolioBalanceByType {
+  account_type: string
+  account_count: number
+  total_capital_base: string
+  total_trade_pnl: string
+  total_allocations: string
+  total_balance: string
+}
+
+export interface PortfolioBalanceTotal {
+  account_count: number
+  total_capital_base: string
+  total_trade_pnl: string
+  total_allocations: string
+  total_balance: string
+}
+
+export interface PortfolioBalance {
+  total: PortfolioBalanceTotal
+  by_type: PortfolioBalanceByType[]
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) {
@@ -36,4 +58,8 @@ export function listAccounts(): Promise<Account[]> {
 
 export function getAccountBalance(accountId: string): Promise<AccountBalance> {
   return getJson(`/accounts/${accountId}/balance`)
+}
+
+export function getPortfolioBalance(): Promise<PortfolioBalance> {
+  return getJson('/portfolio/balance')
 }

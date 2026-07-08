@@ -3,15 +3,23 @@ import {
   getDashboardSummary,
   getPortfolioBalance,
   getSetupPerformance,
+  listAccounts,
+  listHoldings,
   listJournalEntries,
+  listStrategies,
+  type Account,
   type DashboardSummary as DashboardSummaryData,
+  type Holding,
   type JournalEntry,
   type PnlBySetup,
   type PortfolioBalance,
+  type Strategy,
 } from './api'
 import { DashboardSummary } from './components/DashboardSummary'
 import { SetupPerformance } from './components/SetupPerformance'
 import { JournalSection } from './components/JournalSection'
+import { StrategiesSection } from './components/StrategiesSection'
+import { InvestmentsSection } from './components/InvestmentsSection'
 import './App.css'
 
 function App() {
@@ -19,23 +27,39 @@ function App() {
   const [summary, setSummary] = useState<DashboardSummaryData | null>(null)
   const [setupRows, setSetupRows] = useState<PnlBySetup[]>([])
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])
+  const [strategies, setStrategies] = useState<Strategy[]>([])
+  const [holdings, setHoldings] = useState<Holding[]>([])
+  const [accounts, setAccounts] = useState<Account[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       try {
-        const [portfolioBalance, dashboardSummary, setupPerformance, entries] =
-          await Promise.all([
-            getPortfolioBalance(),
-            getDashboardSummary(),
-            getSetupPerformance(),
-            listJournalEntries(),
-          ])
+        const [
+          portfolioBalance,
+          dashboardSummary,
+          setupPerformance,
+          entries,
+          strategyList,
+          holdingList,
+          accountList,
+        ] = await Promise.all([
+          getPortfolioBalance(),
+          getDashboardSummary(),
+          getSetupPerformance(),
+          listJournalEntries(),
+          listStrategies(),
+          listHoldings(),
+          listAccounts(),
+        ])
         setPortfolio(portfolioBalance)
         setSummary(dashboardSummary)
         setSetupRows(setupPerformance)
         setJournalEntries(entries)
+        setStrategies(strategyList)
+        setHoldings(holdingList)
+        setAccounts(accountList)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Failed to load dashboard')
       } finally {
@@ -105,6 +129,18 @@ function App() {
       <JournalSection
         entries={journalEntries}
         onCreated={(entry) => setJournalEntries((prev) => [entry, ...prev])}
+      />
+      <StrategiesSection
+        strategies={strategies}
+        onCreated={(strategy) => setStrategies((prev) => [strategy, ...prev])}
+        onUpdated={(strategy) =>
+          setStrategies((prev) => prev.map((s) => (s.id === strategy.id ? strategy : s)))
+        }
+      />
+      <InvestmentsSection
+        holdings={holdings}
+        portfolioAccounts={accounts.filter((a) => a.account_type === 'personal_portfolio')}
+        onCreated={(holding) => setHoldings((prev) => [holding, ...prev])}
       />
     </main>
   )

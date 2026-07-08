@@ -86,6 +86,71 @@ export interface PnlBySetup {
   win_rate: number | null
 }
 
+export type StrategyStatus = 'draft' | 'backtesting' | 'validated' | 'live' | 'retired'
+
+export interface Strategy {
+  id: string
+  name: string
+  description: string | null
+  rules: Record<string, unknown>
+  status: StrategyStatus
+  created_at: string
+}
+
+export interface StrategyInput {
+  name: string
+  description?: string | null
+  rules: Record<string, unknown>
+}
+
+export interface Backtest {
+  id: string
+  strategy_id: string
+  period_start: string
+  period_end: string
+  data_source: string
+  total_trades: number
+  win_rate: number | null
+  total_pnl: string | null
+  max_drawdown: string | null
+  sharpe_ratio: number | null
+  parameters_snapshot: Record<string, unknown>
+  created_at: string
+}
+
+export interface BacktestInput {
+  period_start: string
+  period_end: string
+  tags?: string[]
+  account_id?: string | null
+}
+
+export interface ValidationStatus {
+  strategy_id: string
+  has_approval: boolean
+  latest_validation: { id: string; approved: boolean; created_at: string } | null
+}
+
+export interface Holding {
+  id: string
+  account_id: string
+  symbol: string
+  quantity: string
+  cost_basis: string
+  acquired_date: string
+  asset_class: string
+  created_at: string
+}
+
+export interface HoldingInput {
+  account_id: string
+  symbol: string
+  quantity: number
+  cost_basis: number
+  acquired_date: string
+  asset_class?: string
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) {
@@ -97,6 +162,18 @@ async function getJson<T>(path: string): Promise<T> {
 async function postJson<T>(path: string, body: unknown): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw new Error(`${path} failed: ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+async function patchJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
@@ -132,4 +209,44 @@ export function createJournalEntry(entry: JournalEntryInput): Promise<JournalEnt
 
 export function getSetupPerformance(): Promise<PnlBySetup[]> {
   return getJson('/analytics/pnl-by-setup')
+}
+
+export function listStrategies(): Promise<Strategy[]> {
+  return getJson('/strategies')
+}
+
+export function createStrategy(strategy: StrategyInput): Promise<Strategy> {
+  return postJson('/strategies', strategy)
+}
+
+export function updateStrategyStatus(id: string, status: StrategyStatus): Promise<Strategy> {
+  return patchJson(`/strategies/${id}`, { status })
+}
+
+export function runBacktest(strategyId: string, input: BacktestInput): Promise<Backtest> {
+  return postJson(`/strategies/${strategyId}/backtests`, input)
+}
+
+export function listBacktests(strategyId: string): Promise<Backtest[]> {
+  return getJson(`/strategies/${strategyId}/backtests`)
+}
+
+export function validateStrategy(
+  strategyId: string,
+  backtestId: string,
+  approved: boolean,
+): Promise<unknown> {
+  return postJson(`/strategies/${strategyId}/validate`, { backtest_id: backtestId, approved })
+}
+
+export function getValidationStatus(strategyId: string): Promise<ValidationStatus> {
+  return getJson(`/strategies/${strategyId}/validation-status`)
+}
+
+export function listHoldings(): Promise<Holding[]> {
+  return getJson('/holdings')
+}
+
+export function createHolding(holding: HoldingInput): Promise<Holding> {
+  return postJson('/holdings', holding)
 }

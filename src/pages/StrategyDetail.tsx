@@ -1,14 +1,19 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 import {
+  createPositionSizingRule,
   getValidationStatus,
   listAccounts,
   listBacktests,
+  listPositionSizingRules,
   listStrategies,
   runBacktest,
   updateStrategyStatus,
   validateStrategy,
   type Backtest,
+  type ConditionGroup,
+  type PositionSizingMethod,
+  type PositionSizingRule,
   type StrategyStatus,
   type StrategyValidation,
 } from '../api'
@@ -20,12 +25,40 @@ import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { StrategyStatusBadge } from '../components/ui/Badge'
 import { Button, Input, Select } from '../components/ui/form'
+import { SIZING_METHOD_LABELS, buildSizingParameters, describeSizingParameters } from '../components/strategies/positionSizing'
 
 const KNOWN_RULE_KEYS = ['entry', 'exit', 'position_sizing']
 const RULE_LABELS: Record<string, string> = {
-  entry: 'Entry condition',
-  exit: 'Exit condition',
-  position_sizing: 'Position sizing',
+  entry: 'Entry conditions',
+  exit: 'Exit conditions',
+  position_sizing: 'Position sizing (legacy)',
+}
+
+function isConditionGroup(value: unknown): value is ConditionGroup {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    Array.isArray((value as ConditionGroup).conditions) &&
+    ('logic' in value)
+  )
+}
+
+function ConditionsSummary({ value }: { value: unknown }) {
+  if (isConditionGroup(value)) {
+    return (
+      <div className="space-y-1 mt-0.5">
+        {value.conditions.map((c, i) => (
+          <div key={i} className="flex items-center gap-2 font-mono text-sm text-text-primary">
+            {i > 0 && <span className="font-sans text-xs font-medium text-accent-violet">{value.logic}</span>}
+            <span>
+              {c.indicator} {c.operator} {c.value}
+            </span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return <div className="text-sm text-text-primary">{String(value)}</div>
 }
 
 function RulesView({ rules }: { rules: Record<string, unknown> }) {
@@ -46,7 +79,7 @@ function RulesView({ rules }: { rules: Record<string, unknown> }) {
           {knownEntries.map((k) => (
             <div key={k}>
               <div className="text-xs text-text-muted">{RULE_LABELS[k]}</div>
-              <div className="text-sm text-text-primary">{String(rules[k])}</div>
+              <ConditionsSummary value={rules[k]} />
             </div>
           ))}
           {extraKeys.length > 0 && (
@@ -66,6 +99,92 @@ function RulesView({ rules }: { rules: Record<string, unknown> }) {
             </div>
           )}
         </div>
+      )}
+    </Card>
+  )
+}
+
+function PositionSizingCard({ strategyId }: { strategyId: string }) {
+  const rulesApi = useApi(() => listPositionSizingRules(strategyId), [strategyId])
+  const [rules, setRules] = useState<PositionSizingRule[]>([])
+  useEffect(() => {
+    if (rulesApi.data) setRules(rulesApi.data)
+  }, [rulesApi.data])
+
+  const [open, setOpen] = useState(false)
+  const [method, setMethod] = useState<PositionSizingMethod>('fixed_contracts')
+  const [value, setValue] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleAdd(e: FormEvent) {
+    e.preventDefault()
+    if (!value.trim()) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const parameters = buildSizingParameters(method, value)
+      const created = await createPositionSizingRule({ strategy_id: strategyId, method, parameters })
+      setRules((prev) => [created, ...prev])
+      setValue('')
+      setOpen(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to add rule')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <Card>
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-sm text-text-muted">Position Sizing</div>
+        <Button variant="secondary" onClick={() => setOpen((v) => !v)}>
+          {open ? 'Cancel' : 'Add rule'}
+        </Button>
+      </div>
+      {open && (
+        <form onSubmit={handleAdd} className="flex flex-wrap items-end gap-1.5 mb-4">
+          <Select value={method} onChange={(e) => setMethod(e.target.value as PositionSizingMethod)} className="w-44">
+            {Object.entries(SIZING_METHOD_LABELS).map(([v, l]) => (
+              <option key={v} value={v}>
+                {l}
+              </option>
+            ))}
+          </Select>
+          <Input
+            type="text"
+            placeholder={method === 'custom' ? 'Notes' : 'Value'}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-40"
+          />
+          <Button type="submit" variant="violet" disabled={submitting}>
+            {submitting ? 'Adding…' : 'Add'}
+          </Button>
+        </form>
+      )}
+      {error && <ErrorState message={error} />}
+      {rulesApi.error && (
+        <ErrorState
+          message="Couldn't load position sizing rules — check your connection and retry."
+          onRetry={rulesApi.refetch}
+        />
+      )}
+      {!rulesApi.error && rules.length === 0 && (
+        <EmptyState title="No position sizing rules yet" description="Add one above." />
+      )}
+      {!rulesApi.error && rules.length > 0 && (
+        <ul className="divide-y divide-border">
+          {rules.map((r) => (
+            <li key={r.id} className="flex items-center justify-between py-2 text-sm">
+              <span className="text-text-primary">{SIZING_METHOD_LABELS[r.method as PositionSizingMethod] ?? r.method}</span>
+              <span className="font-mono tabular-nums text-text-muted">
+                {describeSizingParameters(r.method, r.parameters)}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </Card>
   )
@@ -210,6 +329,7 @@ export function StrategyDetail() {
       {statusError && <ErrorState message={statusError} />}
 
       <RulesView rules={strategy.rules} />
+      <PositionSizingCard strategyId={id} />
 
       <Card>
         <div className="text-sm text-text-muted mb-3">Run a backtest</div>

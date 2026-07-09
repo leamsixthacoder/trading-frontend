@@ -103,6 +103,35 @@ export interface StrategyInput {
   rules: Record<string, unknown>
 }
 
+export interface RuleCondition {
+  indicator: string
+  operator: string
+  value: number
+}
+
+export interface ConditionGroup {
+  logic: 'AND' | 'OR'
+  conditions: RuleCondition[]
+}
+
+export type PositionSizingMethod = 'fixed_contracts' | 'percent_capital' | 'percent_risk' | 'custom'
+
+export interface PositionSizingRule {
+  id: string
+  strategy_id: string | null
+  account_id: string | null
+  method: string
+  parameters: Record<string, unknown>
+  created_at: string
+}
+
+export interface PositionSizingRuleInput {
+  strategy_id?: string | null
+  account_id?: string | null
+  method: string
+  parameters: Record<string, unknown>
+}
+
 export interface Backtest {
   id: string
   strategy_id: string
@@ -498,6 +527,14 @@ export function listStrategies(): Promise<Strategy[]> {
 
 export function createStrategy(strategy: StrategyInput): Promise<Strategy> {
   return postJson('/strategies', strategy)
+}
+
+export function listPositionSizingRules(strategyId?: string, accountId?: string): Promise<PositionSizingRule[]> {
+  return getJson(withQuery('/position-sizing-rules', { strategy_id: strategyId, account_id: accountId }))
+}
+
+export function createPositionSizingRule(rule: PositionSizingRuleInput): Promise<PositionSizingRule> {
+  return postJson('/position-sizing-rules', rule)
 }
 
 export function updateStrategyStatus(id: string, status: StrategyStatus): Promise<Strategy> {

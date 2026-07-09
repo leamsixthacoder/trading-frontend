@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createStrategy, listBacktests, listStrategies, type Backtest, type Strategy } from '../api'
+import {
+  createPositionSizingRule,
+  createStrategy,
+  listBacktests,
+  listStrategies,
+  type Backtest,
+  type ConditionGroup,
+  type PositionSizingMethod,
+  type Strategy,
+} from '../api'
 import { useApi } from '../hooks/useApi'
 import { formatMoney, formatPct, signClass, signOf } from '../lib/format'
 import { Card } from '../components/ui/Card'
@@ -8,7 +17,15 @@ import { StatCardSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { StrategyStatusBadge } from '../components/ui/Badge'
-import { Button, Input } from '../components/ui/form'
+import { Button, Input, Select } from '../components/ui/form'
+import { ConditionBuilder } from '../components/strategies/ConditionBuilder'
+import { emptyConditionGroup } from '../components/strategies/conditions'
+import { SIZING_METHOD_LABELS, buildSizingParameters } from '../components/strategies/positionSizing'
+
+function nonEmptyConditions(group: ConditionGroup): ConditionGroup | null {
+  const conditions = group.conditions.filter((c) => c.indicator.trim())
+  return conditions.length > 0 ? { logic: group.logic, conditions } : null
+}
 
 function useLatestBacktests(strategies: Strategy[] | null) {
   const [map, setMap] = useState<Record<string, Backtest | undefined>>({})
@@ -43,9 +60,10 @@ export function StrategiesList() {
   const [showCreate, setShowCreate] = useState(false)
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [entry, setEntry] = useState('')
-  const [exit, setExit] = useState('')
-  const [positionSizing, setPositionSizing] = useState('')
+  const [entryGroup, setEntryGroup] = useState<ConditionGroup>(emptyConditionGroup)
+  const [exitGroup, setExitGroup] = useState<ConditionGroup>(emptyConditionGroup)
+  const [sizingMethod, setSizingMethod] = useState<PositionSizingMethod>('fixed_contracts')
+  const [sizingValue, setSizingValue] = useState('')
   const [advancedOpen, setAdvancedOpen] = useState(false)
   const [rawExtra, setRawExtra] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -77,16 +95,33 @@ export function StrategiesList() {
     try {
       const extra = rawExtra.trim() ? JSON.parse(rawExtra) : {}
       const rules: Record<string, unknown> = { ...extra }
-      if (entry.trim()) rules.entry = entry.trim()
-      if (exit.trim()) rules.exit = exit.trim()
-      if (positionSizing.trim()) rules.position_sizing = positionSizing.trim()
+      const entry = nonEmptyConditions(entryGroup)
+      const exit = nonEmptyConditions(exitGroup)
+      if (entry) rules.entry = entry
+      if (exit) rules.exit = exit
+
       const created = await createStrategy({ name, description: description || null, rules })
       setItems((prev) => [created, ...prev])
+
+      if (sizingValue.trim()) {
+        try {
+          const parameters = buildSizingParameters(sizingMethod, sizingValue)
+          await createPositionSizingRule({ strategy_id: created.id, method: sizingMethod, parameters })
+        } catch (sizingErr) {
+          setError(
+            `Strategy created, but position sizing rule failed: ${
+              sizingErr instanceof Error ? sizingErr.message : 'unknown error'
+            }`,
+          )
+        }
+      }
+
       setName('')
       setDescription('')
-      setEntry('')
-      setExit('')
-      setPositionSizing('')
+      setEntryGroup(emptyConditionGroup())
+      setExitGroup(emptyConditionGroup())
+      setSizingMethod('fixed_contracts')
+      setSizingValue('')
       setRawExtra('')
       setShowCreate(false)
     } catch (e) {
@@ -107,7 +142,7 @@ export function StrategiesList() {
 
       {showCreate && (
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-3">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
                 type="text"
@@ -122,25 +157,43 @@ export function StrategiesList() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
-              <Input
-                type="text"
-                placeholder="Entry condition"
-                value={entry}
-                onChange={(e) => setEntry(e.target.value)}
-              />
-              <Input
-                type="text"
-                placeholder="Exit condition"
-                value={exit}
-                onChange={(e) => setExit(e.target.value)}
-              />
-              <Input
-                type="text"
-                placeholder="Position sizing"
-                value={positionSizing}
-                onChange={(e) => setPositionSizing(e.target.value)}
-                className="sm:col-span-2"
-              />
+            </div>
+
+            <ConditionBuilder
+              label="Entry conditions"
+              datalistId="entry-indicators"
+              value={entryGroup}
+              onChange={setEntryGroup}
+            />
+            <ConditionBuilder
+              label="Exit conditions"
+              datalistId="exit-indicators"
+              value={exitGroup}
+              onChange={setExitGroup}
+            />
+
+            <div>
+              <div className="text-xs text-text-muted mb-1.5">Position sizing</div>
+              <div className="flex items-center gap-1.5">
+                <Select
+                  value={sizingMethod}
+                  onChange={(e) => setSizingMethod(e.target.value as PositionSizingMethod)}
+                  className="w-44"
+                >
+                  {Object.entries(SIZING_METHOD_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </Select>
+                <Input
+                  type="text"
+                  placeholder={sizingMethod === 'custom' ? 'Notes' : 'Value'}
+                  value={sizingValue}
+                  onChange={(e) => setSizingValue(e.target.value)}
+                  className="w-40"
+                />
+              </div>
             </div>
 
             <button

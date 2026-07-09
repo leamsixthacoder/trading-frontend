@@ -714,6 +714,10 @@ export function getPayoutHistory(accountId: string): Promise<Allocation[]> {
   return getJson(`/accounts/${accountId}/payout-history`)
 }
 
+export function listAccountAllocations(accountId: string): Promise<Allocation[]> {
+  return getJson(`/accounts/${accountId}/allocations`)
+}
+
 export function getStatusHistory(accountId: string): Promise<AccountStatusHistoryEntry[]> {
   return getJson(`/accounts/${accountId}/status-history`)
 }

@@ -5,12 +5,13 @@ import {
   getAccountBalance,
   getAccountPnlDaily,
   getPayoutHistory,
+  listAccountAllocations,
   listAccounts,
   listTrades,
   type Trade,
 } from '../api'
 import { useApi } from '../hooks/useApi'
-import { cumulativeBalanceSeries, cumulativePnlSeries } from '../lib/equity'
+import { balanceAsOf, cumulativeBalanceSeries, cumulativePnlSeries, dailyBalancePoints } from '../lib/equity'
 import { daysSince, dateOnlyKey, formatDate, formatDateUTC, formatMoney, formatPct, isoWeekKey, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCard } from '../components/ui/StatCard'
@@ -85,6 +86,7 @@ export function AccountDetail() {
   const balance = useApi(() => getAccountBalance(id), [id])
   const daily = useApi(() => getAccountPnlDaily(id), [id])
   const payouts = useApi(() => getPayoutHistory(id), [id])
+  const allocations = useApi(() => listAccountAllocations(id), [id])
   const tradesApi = useApi(() => listTrades(id), [id])
   const [summaryView, setSummaryView] = useState<'daily' | 'weekly'>('daily')
   const [page, setPage] = useState(0)
@@ -189,12 +191,14 @@ export function AccountDetail() {
 
   const weeklyRows = useMemo(() => {
     if (!daily.data) return []
-    const map = new Map<string, { week: string; pnl: number; trades: number }>()
+    const map = new Map<string, { week: string; pnl: number; trades: number; endDay: string }>()
     for (const row of daily.data) {
       const key = isoWeekKey(row.day)
-      const existing = map.get(key) ?? { week: key, pnl: 0, trades: 0 }
+      const day = dateOnlyKey(row.day)
+      const existing = map.get(key) ?? { week: key, pnl: 0, trades: 0, endDay: day }
       existing.pnl += toNumber(row.pnl_net)
       existing.trades += row.trade_count
+      if (day > existing.endDay) existing.endDay = day
       map.set(key, existing)
     }
     return Array.from(map.values()).sort((a, b) => b.week.localeCompare(a.week))
@@ -203,6 +207,11 @@ export function AccountDetail() {
   const dailyRowsSorted = useMemo(
     () => (daily.data ? [...daily.data].sort((a, b) => b.day.localeCompare(a.day)) : []),
     [daily.data],
+  )
+
+  const dailyPoints = useMemo(
+    () => (daily.data && account ? dailyBalancePoints(daily.data, allocations.data ?? [], toNumber(account.capital_base)) : []),
+    [daily.data, allocations.data, account],
   )
 
   const rows = summaryView === 'daily' ? dailyRowsSorted : weeklyRows
@@ -424,31 +433,45 @@ export function AccountDetail() {
                 <thead>
                   <tr className="border-b border-border text-left text-text-muted">
                     <th className="py-2 font-normal">{summaryView === 'daily' ? 'Date' : 'Week'}</th>
+                    <th className="py-2 font-normal">Balance</th>
+                    <th className="py-2 font-normal">Equity</th>
                     <th className="py-2 font-normal">Realized P&amp;L</th>
                     <th className="py-2 font-normal">Trades</th>
                   </tr>
                 </thead>
                 <tbody className="font-mono tabular-nums">
                   {summaryView === 'daily'
-                    ? (pageRows as typeof dailyRowsSorted).map((r) => (
-                        <tr key={r.day} className="border-b border-border last:border-0">
-                          <td className="py-2">{formatDateUTC(r.day)}</td>
-                          <td className={`py-2 ${signClass[signOf(r.pnl_net)]}`}>{formatMoney(r.pnl_net)}</td>
-                          <td className="py-2">{r.trade_count}</td>
-                        </tr>
-                      ))
-                    : (pageRows as typeof weeklyRows).map((r) => (
-                        <tr key={r.week} className="border-b border-border last:border-0">
-                          <td className="py-2">{r.week}</td>
-                          <td className={`py-2 ${signClass[signOf(r.pnl)]}`}>{formatMoney(r.pnl)}</td>
-                          <td className="py-2">{r.trades}</td>
-                        </tr>
-                      ))}
+                    ? (pageRows as typeof dailyRowsSorted).map((r) => {
+                        const rowBalance = balanceAsOf(dateOnlyKey(r.day), dailyPoints, toNumber(account.capital_base))
+                        return (
+                          <tr key={r.day} className="border-b border-border last:border-0">
+                            <td className="py-2">{formatDateUTC(r.day)}</td>
+                            <td className="py-2">{formatMoney(rowBalance)}</td>
+                            <td className="py-2">{formatMoney(rowBalance)}</td>
+                            <td className={`py-2 ${signClass[signOf(r.pnl_net)]}`}>{formatMoney(r.pnl_net)}</td>
+                            <td className="py-2">{r.trade_count}</td>
+                          </tr>
+                        )
+                      })
+                    : (pageRows as typeof weeklyRows).map((r) => {
+                        const rowBalance = balanceAsOf(r.endDay, dailyPoints, toNumber(account.capital_base))
+                        return (
+                          <tr key={r.week} className="border-b border-border last:border-0">
+                            <td className="py-2">{r.week}</td>
+                            <td className="py-2">{formatMoney(rowBalance)}</td>
+                            <td className="py-2">{formatMoney(rowBalance)}</td>
+                            <td className={`py-2 ${signClass[signOf(r.pnl)]}`}>{formatMoney(r.pnl)}</td>
+                            <td className="py-2">{r.trades}</td>
+                          </tr>
+                        )
+                      })}
                 </tbody>
               </table>
             </div>
             <div className="text-xs text-text-muted mt-2">
-              Balance/Equity per period aren't served per-day by the backend yet, so only Realized P&amp;L is shown.
+              Balance/Equity is the running total as of the end of that {summaryView === 'daily' ? 'day' : "week's last trading day"}
+              {' '}(capital base + realized P&amp;L + allocations to date). Equity matches Balance until intraday open
+              positions are tracked.
             </div>
             {rows.length > pageSize && (
               <div className="flex items-center justify-end gap-2 mt-3">

@@ -1,15 +1,17 @@
 import { useEffect } from 'react'
 import { formatMoney, signClass, signOf } from '../../lib/format'
 import { EmptyState } from '../ui/EmptyState'
+import { DayTradesTable } from './DayTradesTable'
 import type { DayPnl } from './MonthGrid'
 
 interface DayPanelProps {
   dateKey: string
   data: DayPnl | undefined
+  accountId: string | undefined
   onClose: () => void
 }
 
-export function DayPanel({ dateKey, data, onClose }: DayPanelProps) {
+export function DayPanel({ dateKey, data, accountId, onClose }: DayPanelProps) {
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -55,10 +57,7 @@ export function DayPanel({ dateKey, data, onClose }: DayPanelProps) {
                 <div className="font-mono tabular-nums text-xl text-text-primary">{data.trades}</div>
               </div>
             </div>
-            <EmptyState
-              title="Per-trade detail needs a trade-level endpoint"
-              description="Symbol, direction, entry/exit, and tags aren't exposed yet — only the day's aggregate P&L and trade count are available from the backend today."
-            />
+            <DayTradesTable dateKey={dateKey} accountId={accountId} />
           </>
         )}
       </div>

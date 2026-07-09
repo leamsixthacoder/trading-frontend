@@ -11,6 +11,7 @@ import { Button, Select } from '../components/ui/form'
 import { MonthGrid, type DayPnl } from '../components/calendar/MonthGrid'
 import { YearHeatmap } from '../components/calendar/YearHeatmap'
 import { DayPanel } from '../components/calendar/DayPanel'
+import { DayTradesTable } from '../components/calendar/DayTradesTable'
 
 type View = 'day' | 'month' | 'year'
 
@@ -161,17 +162,20 @@ export function Calendar() {
             {!dayData || (dayData.pnl === 0 && dayData.trades === 0) ? (
               <EmptyState title="No trades this day" description="Nothing recorded for this date." />
             ) : (
-              <div className="grid grid-cols-2 gap-4 max-w-sm">
-                <div>
-                  <div className="text-xs text-text-muted">Realized P&amp;L</div>
-                  <div className={`font-mono tabular-nums text-xl ${signClass[signOf(dayData.pnl)]}`}>
-                    {formatMoney(dayData.pnl)}
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4 max-w-sm">
+                  <div>
+                    <div className="text-xs text-text-muted">Realized P&amp;L</div>
+                    <div className={`font-mono tabular-nums text-xl ${signClass[signOf(dayData.pnl)]}`}>
+                      {formatMoney(dayData.pnl)}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-text-muted">Trades</div>
+                    <div className="font-mono tabular-nums text-xl text-text-primary">{dayData.trades}</div>
                   </div>
                 </div>
-                <div>
-                  <div className="text-xs text-text-muted">Trades</div>
-                  <div className="font-mono tabular-nums text-xl text-text-primary">{dayData.trades}</div>
-                </div>
+                <DayTradesTable dateKey={dayKey} accountId={scope === 'all' ? undefined : scope} />
               </div>
             )}
           </>
@@ -179,7 +183,12 @@ export function Calendar() {
       </Card>
 
       {selectedDayKey && (
-        <DayPanel dateKey={selectedDayKey} data={dataByDay[selectedDayKey]} onClose={() => setSelectedDayKey(null)} />
+        <DayPanel
+          dateKey={selectedDayKey}
+          data={dataByDay[selectedDayKey]}
+          accountId={scope === 'all' ? undefined : scope}
+          onClose={() => setSelectedDayKey(null)}
+        />
       )}
     </div>
   )

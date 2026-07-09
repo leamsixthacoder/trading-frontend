@@ -650,8 +650,8 @@ export function createTrade(trade: TradeInput): Promise<Trade> {
   return postJson('/trades', trade)
 }
 
-export function listTrades(accountId?: string, symbol?: string): Promise<Trade[]> {
-  return getJson(withQuery('/trades', { account_id: accountId, symbol }))
+export function listTrades(accountId?: string, symbol?: string, exitDate?: string): Promise<Trade[]> {
+  return getJson(withQuery('/trades', { account_id: accountId, symbol, exit_date: exitDate }))
 }
 
 function csvImportForm(accountId: string, platform: CsvPlatform, file: File): FormData {

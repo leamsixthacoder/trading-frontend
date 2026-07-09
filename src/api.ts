@@ -161,6 +161,28 @@ export interface HoldingInput {
   asset_class?: string
 }
 
+export interface HoldingUpdate {
+  quantity?: number | null
+  cost_basis?: number | null
+  asset_class?: string | null
+}
+
+export interface PortfolioSnapshot {
+  id: string
+  account_id: string
+  snapshot_date: string
+  total_value: string
+  holdings_detail: Record<string, unknown>
+  created_at: string
+}
+
+export interface PortfolioSnapshotInput {
+  account_id: string
+  snapshot_date: string
+  total_value: number
+  holdings_detail?: Record<string, unknown>
+}
+
 export interface PayoutRule {
   id: string
   account_type: string
@@ -257,6 +279,18 @@ export interface PnlByDay {
 
 export interface PnlByMonth {
   account_id: string
+  month: string
+  pnl_net: string
+  trade_count: number
+}
+
+export interface PortfolioPnlByDay {
+  day: string
+  pnl_net: string
+  trade_count: number
+}
+
+export interface PortfolioPnlByMonth {
   month: string
   pnl_net: string
   trade_count: number
@@ -399,12 +433,28 @@ export function getValidationStatus(strategyId: string): Promise<ValidationStatu
   return getJson(`/strategies/${strategyId}/validation-status`)
 }
 
-export function listHoldings(): Promise<Holding[]> {
-  return getJson('/holdings')
+export function listHoldings(accountId?: string): Promise<Holding[]> {
+  return getJson(withQuery('/holdings', { account_id: accountId }))
 }
 
 export function createHolding(holding: HoldingInput): Promise<Holding> {
   return postJson('/holdings', holding)
+}
+
+export function updateHolding(holdingId: string, patch: HoldingUpdate): Promise<Holding> {
+  return patchJson(`/holdings/${holdingId}`, patch)
+}
+
+export function listPortfolioSnapshots(
+  accountId: string,
+  from?: string,
+  to?: string,
+): Promise<PortfolioSnapshot[]> {
+  return getJson(withQuery('/portfolio-snapshots', { account_id: accountId, from_: from, to }))
+}
+
+export function createPortfolioSnapshot(input: PortfolioSnapshotInput): Promise<PortfolioSnapshot> {
+  return postJson('/portfolio-snapshots', input)
 }
 
 export function listPayoutRules(): Promise<PayoutRule[]> {
@@ -462,6 +512,14 @@ export function getAccountPnlDaily(
   end?: string,
 ): Promise<PnlByDay[]> {
   return getJson(withQuery(`/accounts/${accountId}/pnl/daily`, { start, end }))
+}
+
+export function getPortfolioPnlDaily(start?: string, end?: string): Promise<PortfolioPnlByDay[]> {
+  return getJson(withQuery('/portfolio/pnl/daily', { start, end }))
+}
+
+export function getPortfolioPnlMonthly(start?: string, end?: string): Promise<PortfolioPnlByMonth[]> {
+  return getJson(withQuery('/portfolio/pnl/monthly', { start, end }))
 }
 
 export function getAccountPnlMonthly(accountId: string): Promise<PnlByMonth[]> {

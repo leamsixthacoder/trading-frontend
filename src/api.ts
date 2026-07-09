@@ -455,6 +455,13 @@ export interface AccountRuleInput {
   threshold: number
 }
 
+export interface Quote {
+  symbol: string
+  price: string | null
+  as_of: string | null
+  error: string | null
+}
+
 export interface PortfolioReturn {
   account_id: string
   period: string
@@ -733,4 +740,9 @@ export function createAccountRule(accountId: string, input: AccountRuleInput): P
 
 export function updateAccountRule(accountId: string, ruleId: string, threshold: number): Promise<AccountRule> {
   return patchJson(`/accounts/${accountId}/rules/${ruleId}`, { threshold })
+}
+
+export function getQuotes(symbols: string[]): Promise<Quote[]> {
+  if (symbols.length === 0) return Promise.resolve([])
+  return getJson(withQuery('/quotes', { symbols: symbols.join(',') }))
 }

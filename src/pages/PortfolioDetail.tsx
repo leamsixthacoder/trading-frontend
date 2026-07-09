@@ -5,6 +5,7 @@ import {
   createHolding,
   createPortfolioSnapshot,
   getPortfolioReturns,
+  getQuotes,
   listAccounts,
   listHoldings,
   listPortfolioSnapshots,
@@ -12,9 +13,10 @@ import {
   type Holding,
   type PortfolioReturn,
   type PortfolioSnapshot,
+  type Quote,
 } from '../api'
 import { useApi } from '../hooks/useApi'
-import { formatDate, formatDateUTC, formatMoney, formatSignedPct, signClass, signOf, toNumber } from '../lib/format'
+import { formatDate, formatDateUTC, formatMoney, formatSigned, formatSignedPct, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCardSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -36,22 +38,33 @@ function holdingValue(h: Holding): number {
   return toNumber(h.quantity) * toNumber(h.cost_basis)
 }
 
-function AllocationDonut({ holdings }: { holdings: Holding[] }) {
+function holdingPrice(h: Holding, quoteBySymbol: Record<string, Quote>): number | null {
+  const quote = quoteBySymbol[h.symbol]
+  if (!quote || quote.price === null) return null
+  return toNumber(quote.price)
+}
+
+function holdingMarketValue(h: Holding, quoteBySymbol: Record<string, Quote>): number {
+  const price = holdingPrice(h, quoteBySymbol)
+  return price !== null ? price * toNumber(h.quantity) : holdingValue(h)
+}
+
+function AllocationDonut({ holdings, quoteBySymbol }: { holdings: Holding[]; quoteBySymbol: Record<string, Quote> }) {
   const [groupBy, setGroupBy] = useState<'asset_class' | 'symbol'>('asset_class')
 
   const data = useMemo(() => {
     const map = new Map<string, number>()
     for (const h of holdings) {
       const key = groupBy === 'asset_class' ? h.asset_class || 'unknown' : h.symbol
-      map.set(key, (map.get(key) ?? 0) + holdingValue(h))
+      map.set(key, (map.get(key) ?? 0) + holdingMarketValue(h, quoteBySymbol))
     }
     return Array.from(map.entries()).map(([name, value]) => ({ name, value }))
-  }, [holdings, groupBy])
+  }, [holdings, groupBy, quoteBySymbol])
 
   return (
     <Card>
       <div className="flex items-center justify-between mb-3">
-        <div className="text-sm text-text-muted">Allocation (by cost basis)</div>
+        <div className="text-sm text-text-muted">Allocation (market value where priced, else cost basis)</div>
         <div className="flex rounded-md border border-border p-0.5">
           {(['asset_class', 'symbol'] as const).map((v) => (
             <button
@@ -171,9 +184,17 @@ export function PortfolioDetail() {
     if (snapshots.data) setSnapshotItems(snapshots.data)
   }, [snapshots.data])
 
-  const totalCostBasisValue = useMemo(
-    () => holdingItems.reduce((sum, h) => sum + holdingValue(h), 0),
-    [holdingItems],
+  const symbols = useMemo(() => Array.from(new Set(holdingItems.map((h) => h.symbol))), [holdingItems])
+  const quotes = useApi(() => getQuotes(symbols), [symbols.join(',')])
+  const quoteBySymbol = useMemo(() => {
+    const map: Record<string, Quote> = {}
+    for (const q of quotes.data ?? []) map[q.symbol] = q
+    return map
+  }, [quotes.data])
+
+  const totalMarketValue = useMemo(
+    () => holdingItems.reduce((sum, h) => sum + holdingMarketValue(h, quoteBySymbol), 0),
+    [holdingItems, quoteBySymbol],
   )
 
   // add-holding form
@@ -349,7 +370,11 @@ export function PortfolioDetail() {
                 <tbody className="font-mono tabular-nums">
                   {holdingItems.map((h) => {
                     const value = holdingValue(h)
-                    const pct = totalCostBasisValue > 0 ? (value / totalCostBasisValue) * 100 : 0
+                    const price = holdingPrice(h, quoteBySymbol)
+                    const currentValue = price !== null ? price * toNumber(h.quantity) : null
+                    const unrealizedGain = currentValue !== null ? currentValue - value : null
+                    const marketValue = holdingMarketValue(h, quoteBySymbol)
+                    const pct = totalMarketValue > 0 ? (marketValue / totalMarketValue) * 100 : 0
                     const isEditing = editingId === h.id
                     return (
                       <tr key={h.id} className="border-b border-border last:border-0">
@@ -381,8 +406,21 @@ export function PortfolioDetail() {
                         </td>
                         <td className="py-2">{formatMoney(value)}</td>
                         <td className="py-2">{pct.toFixed(1)}%</td>
-                        <td className="py-2 text-text-muted">—</td>
-                        <td className="py-2 text-text-muted">—</td>
+                        <td className="py-2">
+                          {currentValue !== null ? (
+                            formatMoney(currentValue)
+                          ) : (
+                            <span
+                              className="text-text-muted"
+                              title={quoteBySymbol[h.symbol]?.error ?? 'Price not loaded yet'}
+                            >
+                              —
+                            </span>
+                          )}
+                        </td>
+                        <td className={`py-2 ${unrealizedGain !== null ? signClass[signOf(unrealizedGain)] : 'text-text-muted'}`}>
+                          {unrealizedGain !== null ? formatSigned(unrealizedGain) : '—'}
+                        </td>
                         <td className="py-2">{formatDateUTC(h.acquired_date)}</td>
                         <td className="py-2 font-sans">
                           {isEditing ? (
@@ -410,14 +448,15 @@ export function PortfolioDetail() {
               </table>
             </div>
             <div className="text-xs text-text-muted mt-2">
-              Current value and unrealized gain/loss need a live/delayed price source — not wired up yet, so % of
-              portfolio above is weighted by cost basis rather than market value.
+              {quotes.loading
+                ? 'Loading prices…'
+                : 'Prices are delayed quotes, not real-time. A row shows — if that symbol\'s price couldn\'t be looked up (hover for why); % of portfolio falls back to cost basis for those rows.'}
             </div>
           </>
         )}
       </Card>
 
-      <AllocationDonut holdings={holdingItems} />
+      <AllocationDonut holdings={holdingItems} quoteBySymbol={quoteBySymbol} />
 
       <ReturnsRow accountId={id} />
 

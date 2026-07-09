@@ -294,7 +294,7 @@ export function PortfolioDetail() {
       <Card>
         <div className="text-sm text-text-muted mb-3">Holdings</div>
         <form onSubmit={handleAddHolding} className="flex flex-wrap items-end gap-2 mb-4">
-          <InstrumentPicker value={symbol} onChange={setSymbol} className="w-28" />
+          <InstrumentPicker value={symbol} onChange={setSymbol} mode="stock" className="w-28" />
           <Select value={assetClass} onChange={(e) => setAssetClass(e.target.value)}>
             <option value="equity">Equity</option>
             <option value="etf">ETF</option>

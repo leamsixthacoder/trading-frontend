@@ -22,6 +22,7 @@ import { DonutRing } from '../components/ui/DonutRing'
 import { Button } from '../components/ui/form'
 import { LineAreaChart } from '../components/charts/LineAreaChart'
 import { TradeEntryForm } from '../components/TradeEntryForm'
+import { CsvImportSection } from '../components/CsvImportSection'
 
 function GapTile({ label, note }: { label: string; note: string }) {
   return (
@@ -95,6 +96,12 @@ export function AccountDetail() {
 
   function handleTradeCreated(trade: Trade) {
     setTrades((prev) => [trade, ...prev])
+    balance.refetch()
+    daily.refetch()
+  }
+
+  function handleImported() {
+    tradesApi.refetch()
     balance.refetch()
     daily.refetch()
   }
@@ -228,6 +235,8 @@ export function AccountDetail() {
       ) : (
         <TradeEntryForm accountId={id} trades={trades} onCreated={handleTradeCreated} />
       )}
+
+      <CsvImportSection accountId={id} onImported={handleImported} />
 
       {/* Stat row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

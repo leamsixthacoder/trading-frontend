@@ -308,6 +308,52 @@ export interface TradeInput {
   notes?: string | null
 }
 
+export type CsvPlatform = 'ninjatrader' | 'tradestation' | 'topstepx'
+
+export interface CsvImportRowError {
+  row_number: number
+  field: string
+  message: string
+}
+
+export interface CsvImportPreviewRow {
+  row_number: number
+  external_trade_id: string
+  symbol: string
+  direction: TradeDirection
+  size: string
+  entry_price: string
+  exit_price: string | null
+  entry_time: string
+  exit_time: string | null
+  fees: string
+  pnl_gross: string | null
+  is_duplicate: boolean
+}
+
+export interface CsvImportPreview {
+  platform: string
+  total_rows: number
+  valid_count: number
+  duplicate_count: number
+  error_count: number
+  rows: CsvImportPreviewRow[]
+  errors: CsvImportRowError[]
+}
+
+export interface CsvImport {
+  id: string
+  account_id: string
+  source_platform: string
+  filename: string
+  imported_at: string
+  row_count: number
+  rows_inserted: number
+  rows_skipped_dupe: number
+  status: string
+  validation_errors: CsvImportRowError[]
+}
+
 export interface PnlByDay {
   account_id: string
   day: string
@@ -402,6 +448,18 @@ async function patchJson<T>(path: string, body: unknown): Promise<T> {
   })
   if (!res.ok) {
     throw new Error(`${path} failed: ${res.status}`)
+  }
+  return res.json() as Promise<T>
+}
+
+async function postForm<T>(path: string, form: FormData): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, { method: 'POST', body: form })
+  if (!res.ok) {
+    const detail = await res
+      .json()
+      .then((d: { detail?: unknown }) => d.detail)
+      .catch(() => null)
+    throw new Error(typeof detail === 'string' ? detail : `${path} failed: ${res.status}`)
   }
   return res.json() as Promise<T>
 }
@@ -541,6 +599,26 @@ export function createTrade(trade: TradeInput): Promise<Trade> {
 
 export function listTrades(accountId?: string, symbol?: string): Promise<Trade[]> {
   return getJson(withQuery('/trades', { account_id: accountId, symbol }))
+}
+
+function csvImportForm(accountId: string, platform: CsvPlatform, file: File): FormData {
+  const form = new FormData()
+  form.append('account_id', accountId)
+  form.append('platform', platform)
+  form.append('file', file)
+  return form
+}
+
+export function previewCsvImport(accountId: string, platform: CsvPlatform, file: File): Promise<CsvImportPreview> {
+  return postForm('/csv-imports/preview', csvImportForm(accountId, platform, file))
+}
+
+export function commitCsvImport(accountId: string, platform: CsvPlatform, file: File): Promise<CsvImport> {
+  return postForm('/csv-imports', csvImportForm(accountId, platform, file))
+}
+
+export function listCsvImports(accountId?: string): Promise<CsvImport[]> {
+  return getJson(withQuery('/csv-imports', { account_id: accountId }))
 }
 
 function withQuery(path: string, params: Record<string, string | boolean | undefined>): string {

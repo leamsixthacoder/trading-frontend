@@ -42,23 +42,28 @@ export function TopNav() {
       </span>
 
       <nav className="flex flex-1 items-center gap-1 overflow-x-auto no-scrollbar" aria-label="Main">
-        {navItems.map(({ to, label, icon: ItemIcon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end}
-            className={({ isActive }) =>
-              `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
-                isActive
-                  ? 'bg-surface-raised text-text-primary'
-                  : 'text-text-muted hover:text-text-primary'
-              }`
-            }
-          >
-            <ItemIcon />
-            <span className="hidden lg:inline">{label}</span>
-          </NavLink>
-        ))}
+        {navItems.map(({ to, label, icon: ItemIcon, end }) => {
+          const isViolet = to === '/strategies'
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) =>
+                `flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors ${
+                  isActive
+                    ? isViolet
+                      ? 'bg-accent-violet/10 text-accent-violet'
+                      : 'bg-surface-raised text-text-primary'
+                    : 'text-text-muted hover:text-text-primary'
+                }`
+              }
+            >
+              <ItemIcon />
+              <span className="hidden lg:inline">{label}</span>
+            </NavLink>
+          )
+        })}
       </nav>
 
       <div className="relative shrink-0">

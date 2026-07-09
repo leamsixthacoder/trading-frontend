@@ -48,3 +48,16 @@ export function StatusBadge({ status }: { status: string }) {
   const label = status === 'failed' ? 'Breached' : status.charAt(0).toUpperCase() + status.slice(1)
   return <Badge tone={statusTone[status] ?? 'neutral'}>{label}</Badge>
 }
+
+export function StrategyStatusBadge({ status }: { status: string }) {
+  const label = status.charAt(0).toUpperCase() + status.slice(1)
+  if (status === 'live') {
+    return (
+      <span className="inline-flex items-center rounded-full border border-accent-violet bg-accent-violet px-2.5 py-0.5 text-xs font-medium text-bg">
+        {label}
+      </span>
+    )
+  }
+  const tone: BadgeTone = status === 'draft' || status === 'retired' ? 'muted' : 'violet'
+  return <Badge tone={tone}>{label}</Badge>
+}

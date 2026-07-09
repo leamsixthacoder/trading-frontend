@@ -131,6 +131,16 @@ export interface ValidationStatus {
   latest_validation: { id: string; approved: boolean; created_at: string } | null
 }
 
+export interface StrategyValidation {
+  id: string
+  strategy_id: string
+  backtest_id: string
+  approved: boolean
+  criteria_met: Record<string, unknown>
+  notes: string | null
+  created_at: string
+}
+
 export interface Holding {
   id: string
   account_id: string
@@ -376,8 +386,13 @@ export function validateStrategy(
   strategyId: string,
   backtestId: string,
   approved: boolean,
-): Promise<unknown> {
-  return postJson(`/strategies/${strategyId}/validate`, { backtest_id: backtestId, approved })
+  notes?: string,
+): Promise<StrategyValidation> {
+  return postJson(`/strategies/${strategyId}/validate`, {
+    backtest_id: backtestId,
+    approved,
+    notes: notes || null,
+  })
 }
 
 export function getValidationStatus(strategyId: string): Promise<ValidationStatus> {

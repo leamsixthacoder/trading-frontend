@@ -238,6 +238,60 @@ export interface TradeReviewInput {
   what_to_change?: string | null
 }
 
+export interface PnlByDay {
+  account_id: string
+  day: string
+  pnl_net: string
+  trade_count: number
+}
+
+export interface PnlByMonth {
+  account_id: string
+  month: string
+  pnl_net: string
+  trade_count: number
+}
+
+export interface Allocation {
+  id: string
+  account_id: string
+  type: string
+  amount: string
+  period_start: string | null
+  period_end: string | null
+  computed_from: Record<string, unknown>
+  memo: string | null
+  created_at: string
+  created_by: string
+}
+
+export interface AccountStatusHistoryEntry {
+  old_status: string | null
+  new_status: string
+  changed_at: string
+  memo: string | null
+}
+
+export interface RiskAlert {
+  id: string
+  account_id: string
+  risk_rule_id: string
+  triggered_at: string
+  actual_value: string
+  threshold_value: string
+  acknowledged: boolean
+}
+
+export interface PortfolioReturn {
+  account_id: string
+  period: string
+  start_date: string
+  end_date: string
+  start_value: string
+  end_value: string
+  return_pct: number
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) {
@@ -376,4 +430,45 @@ export function listTradeReviews(): Promise<TradeReview[]> {
 
 export function createTradeReview(review: TradeReviewInput): Promise<TradeReview> {
   return postJson('/trade-reviews', review)
+}
+
+function withQuery(path: string, params: Record<string, string | boolean | undefined>): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined) search.set(key, String(value))
+  }
+  const qs = search.toString()
+  return qs ? `${path}?${qs}` : path
+}
+
+export function getAccountPnlDaily(
+  accountId: string,
+  start?: string,
+  end?: string,
+): Promise<PnlByDay[]> {
+  return getJson(withQuery(`/accounts/${accountId}/pnl/daily`, { start, end }))
+}
+
+export function getAccountPnlMonthly(accountId: string): Promise<PnlByMonth[]> {
+  return getJson(`/accounts/${accountId}/pnl/monthly`)
+}
+
+export function getPayoutHistory(accountId: string): Promise<Allocation[]> {
+  return getJson(`/accounts/${accountId}/payout-history`)
+}
+
+export function getStatusHistory(accountId: string): Promise<AccountStatusHistoryEntry[]> {
+  return getJson(`/accounts/${accountId}/status-history`)
+}
+
+export function listRiskAlerts(acknowledged?: boolean, accountId?: string): Promise<RiskAlert[]> {
+  return getJson(withQuery('/risk-alerts', { acknowledged, account_id: accountId }))
+}
+
+export function acknowledgeRiskAlert(alertId: string): Promise<RiskAlert> {
+  return postJson(`/risk-alerts/${alertId}/acknowledge`, {})
+}
+
+export function getPortfolioReturns(accountId: string, period: string): Promise<PortfolioReturn> {
+  return getJson(withQuery('/portfolio/returns', { account_id: accountId, period }))
 }

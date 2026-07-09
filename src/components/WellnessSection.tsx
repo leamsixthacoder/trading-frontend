@@ -5,6 +5,11 @@ import {
   type EmotionalStateLog,
   type TradeReview,
 } from '../api'
+import { Card } from './ui/Card'
+import { EmptyState } from './ui/EmptyState'
+import { ErrorState } from './ui/ErrorState'
+import { Button, Input } from './ui/form'
+import { formatDate } from '../lib/format'
 
 interface Props {
   emotionalStateLogs: EmotionalStateLog[]
@@ -80,118 +85,129 @@ export function WellnessSection({
   }
 
   return (
-    <section>
-      <h2>Wellness</h2>
+    <div className="space-y-6">
+      <h1 className="text-2xl font-medium text-text-primary">Wellness</h1>
 
-      <h3>Emotional state log</h3>
-      <form onSubmit={handleLogSubmit}>
-        <input
-          type="text"
-          placeholder="tags (comma separated)"
-          value={tags}
-          onChange={(e) => setTags(e.target.value)}
-        />
-        <input
-          type="number"
-          min={1}
-          max={10}
-          placeholder="Intensity 1-10"
-          value={intensity}
-          onChange={(e) => setIntensity(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="Note"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-        />
-        <button type="submit" disabled={logSubmitting}>
-          {logSubmitting ? 'Saving...' : 'Log state'}
-        </button>
-      </form>
-      {logError && <p>Error: {logError}</p>}
+      <Card>
+        <h2 className="text-sm text-text-muted mb-3">Emotional state log</h2>
+        <form onSubmit={handleLogSubmit} className="flex flex-wrap items-center gap-2 mb-4">
+          <Input
+            type="text"
+            placeholder="tags (comma separated)"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+            className="min-w-[200px]"
+          />
+          <Input
+            type="number"
+            min={1}
+            max={10}
+            placeholder="Intensity 1-10"
+            value={intensity}
+            onChange={(e) => setIntensity(e.target.value)}
+            className="w-32"
+          />
+          <Input
+            type="text"
+            placeholder="Note"
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="min-w-[200px] flex-1"
+          />
+          <Button type="submit" disabled={logSubmitting}>
+            {logSubmitting ? 'Saving…' : 'Log state'}
+          </Button>
+        </form>
+        {logError && <ErrorState message={logError} />}
 
-      {emotionalStateLogs.length === 0 ? (
-        <p>No emotional state logs yet.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Logged at</th>
-              <th>Tags</th>
-              <th>Intensity</th>
-              <th>Note</th>
-            </tr>
-          </thead>
-          <tbody>
-            {emotionalStateLogs.map((log) => (
-              <tr key={log.id}>
-                <td>{log.logged_at}</td>
-                <td>{log.state_tags.join(', ')}</td>
-                <td>{log.intensity ?? '-'}</td>
-                <td>{log.note ?? '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+        {emotionalStateLogs.length === 0 ? (
+          <EmptyState title="No emotional state logs yet" description="Log how you're feeling above to start tracking patterns." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-text-muted">
+                  <th className="py-2 font-normal">Logged at</th>
+                  <th className="py-2 font-normal">Tags</th>
+                  <th className="py-2 font-normal">Intensity</th>
+                  <th className="py-2 font-normal">Note</th>
+                </tr>
+              </thead>
+              <tbody>
+                {emotionalStateLogs.map((log) => (
+                  <tr key={log.id} className="border-b border-border last:border-0">
+                    <td className="py-2 font-mono tabular-nums whitespace-nowrap">{formatDate(log.logged_at)}</td>
+                    <td className="py-2">{log.state_tags.join(', ') || '—'}</td>
+                    <td className="py-2 font-mono tabular-nums">{log.intensity ?? '—'}</td>
+                    <td className="py-2">{log.note ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
-      <h3>Trade review</h3>
-      <form onSubmit={handleReviewSubmit}>
-        <input
-          type="text"
-          placeholder="Trade ID (optional)"
-          value={tradeId}
-          onChange={(e) => setTradeId(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="What happened"
-          value={whatHappened}
-          onChange={(e) => setWhatHappened(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="What went well"
-          value={whatWentWell}
-          onChange={(e) => setWhatWentWell(e.target.value)}
-        />
-        <input
-          type="text"
-          placeholder="What to change"
-          value={whatToChange}
-          onChange={(e) => setWhatToChange(e.target.value)}
-        />
-        <button type="submit" disabled={reviewSubmitting}>
-          {reviewSubmitting ? 'Saving...' : 'Save review'}
-        </button>
-      </form>
-      {reviewError && <p>Error: {reviewError}</p>}
+      <Card>
+        <h2 className="text-sm text-text-muted mb-3">Trade review</h2>
+        <form onSubmit={handleReviewSubmit} className="grid grid-cols-1 gap-2 mb-4 sm:grid-cols-2">
+          <Input
+            type="text"
+            placeholder="Trade ID (optional)"
+            value={tradeId}
+            onChange={(e) => setTradeId(e.target.value)}
+          />
+          <Input
+            type="text"
+            placeholder="What happened"
+            value={whatHappened}
+            onChange={(e) => setWhatHappened(e.target.value)}
+          />
+          <Input
+            type="text"
+            placeholder="What went well"
+            value={whatWentWell}
+            onChange={(e) => setWhatWentWell(e.target.value)}
+          />
+          <Input
+            type="text"
+            placeholder="What to change"
+            value={whatToChange}
+            onChange={(e) => setWhatToChange(e.target.value)}
+          />
+          <Button type="submit" disabled={reviewSubmitting} className="sm:col-span-2 justify-self-start">
+            {reviewSubmitting ? 'Saving…' : 'Save review'}
+          </Button>
+        </form>
+        {reviewError && <ErrorState message={reviewError} />}
 
-      {tradeReviews.length === 0 ? (
-        <p>No trade reviews yet.</p>
-      ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>Trade ID</th>
-              <th>What happened</th>
-              <th>Went well</th>
-              <th>To change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tradeReviews.map((r) => (
-              <tr key={r.id}>
-                <td>{r.trade_id ?? '-'}</td>
-                <td>{r.what_happened}</td>
-                <td>{r.what_went_well}</td>
-                <td>{r.what_to_change}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-    </section>
+        {tradeReviews.length === 0 ? (
+          <EmptyState title="No trade reviews yet" description="Write a structured review above after a notable trade." />
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border text-left text-text-muted">
+                  <th className="py-2 font-normal">Trade ID</th>
+                  <th className="py-2 font-normal">What happened</th>
+                  <th className="py-2 font-normal">Went well</th>
+                  <th className="py-2 font-normal">To change</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tradeReviews.map((r) => (
+                  <tr key={r.id} className="border-b border-border last:border-0">
+                    <td className="py-2 font-mono tabular-nums">{r.trade_id ?? '—'}</td>
+                    <td className="py-2">{r.what_happened}</td>
+                    <td className="py-2">{r.what_went_well ?? '—'}</td>
+                    <td className="py-2">{r.what_to_change ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
   )
 }

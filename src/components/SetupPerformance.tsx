@@ -1,44 +1,46 @@
 import type { PnlBySetup } from '../api'
+import { EmptyState } from './ui/EmptyState'
+import { formatMoney, formatPct, signClass, signOf } from '../lib/format'
 
 interface Props {
   rows: PnlBySetup[]
 }
 
 export function SetupPerformance({ rows }: Props) {
-  if (rows.length === 0) {
-    return (
-      <section>
-        <h2>Setup performance</h2>
-        <p>No tagged, closed trades yet.</p>
-      </section>
-    )
-  }
-
   return (
     <section>
-      <h2>Setup performance</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Setup</th>
-            <th>Trades</th>
-            <th>Total P&amp;L</th>
-            <th>Avg P&amp;L</th>
-            <th>Win rate</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={`${r.account_id}-${r.setup_tag}`}>
-              <td>{r.setup_tag}</td>
-              <td>{r.trade_count}</td>
-              <td>{r.total_pnl}</td>
-              <td>{r.avg_pnl ?? '-'}</td>
-              <td>{r.win_rate !== null ? `${(r.win_rate * 100).toFixed(1)}%` : '-'}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <h2 className="text-sm text-text-muted mb-3">Setup Performance</h2>
+      {rows.length === 0 ? (
+        <EmptyState
+          title="No tagged, closed trades yet"
+          description="Tag trades with a setup on import to see per-setup performance here."
+        />
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-text-muted">
+                <th className="py-2 font-normal">Setup</th>
+                <th className="py-2 font-normal">Trades</th>
+                <th className="py-2 font-normal">Total P&amp;L</th>
+                <th className="py-2 font-normal">Avg P&amp;L</th>
+                <th className="py-2 font-normal">Win rate</th>
+              </tr>
+            </thead>
+            <tbody className="font-mono tabular-nums">
+              {rows.map((r) => (
+                <tr key={`${r.account_id}-${r.setup_tag}`} className="border-b border-border last:border-0">
+                  <td className="py-2 font-sans">{r.setup_tag}</td>
+                  <td className="py-2">{r.trade_count}</td>
+                  <td className={`py-2 ${signClass[signOf(r.total_pnl)]}`}>{formatMoney(r.total_pnl)}</td>
+                  <td className="py-2">{r.avg_pnl ? formatMoney(r.avg_pnl) : '—'}</td>
+                  <td className="py-2">{formatPct(r.win_rate, { fromRatio: true })}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </section>
   )
 }

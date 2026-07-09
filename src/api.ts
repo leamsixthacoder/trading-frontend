@@ -439,6 +439,22 @@ export interface RiskAlert {
   acknowledged: boolean
 }
 
+export type AccountRuleType = 'profit_target' | 'daily_loss_limit' | 'max_loss_limit'
+
+export interface AccountRule {
+  id: string
+  account_id: string
+  rule_type: AccountRuleType
+  threshold: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AccountRuleInput {
+  rule_type: AccountRuleType
+  threshold: number
+}
+
 export interface PortfolioReturn {
   account_id: string
   period: string
@@ -705,4 +721,16 @@ export function acknowledgeRiskAlert(alertId: string): Promise<RiskAlert> {
 
 export function getPortfolioReturns(accountId: string, period: string): Promise<PortfolioReturn> {
   return getJson(withQuery('/portfolio/returns', { account_id: accountId, period }))
+}
+
+export function listAccountRules(accountId: string): Promise<AccountRule[]> {
+  return getJson(`/accounts/${accountId}/rules`)
+}
+
+export function createAccountRule(accountId: string, input: AccountRuleInput): Promise<AccountRule> {
+  return postJson(`/accounts/${accountId}/rules`, input)
+}
+
+export function updateAccountRule(accountId: string, ruleId: string, threshold: number): Promise<AccountRule> {
+  return patchJson(`/accounts/${accountId}/rules/${ruleId}`, { threshold })
 }

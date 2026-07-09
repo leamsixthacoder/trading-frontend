@@ -11,7 +11,7 @@ import {
 } from '../api'
 import { useApi } from '../hooks/useApi'
 import { cumulativeBalanceSeries, cumulativePnlSeries } from '../lib/equity'
-import { daysSince, formatDate, formatDateUTC, formatMoney, formatPct, isoWeekKey, signClass, signOf, toNumber } from '../lib/format'
+import { daysSince, dateOnlyKey, formatDate, formatDateUTC, formatMoney, formatPct, isoWeekKey, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCard } from '../components/ui/StatCard'
 import { StatCardSkeleton } from '../components/ui/Skeleton'
@@ -23,6 +23,7 @@ import { Button } from '../components/ui/form'
 import { LineAreaChart } from '../components/charts/LineAreaChart'
 import { TradeEntryForm } from '../components/TradeEntryForm'
 import { CsvImportSection } from '../components/CsvImportSection'
+import { AccountRulesSection } from '../components/AccountRulesSection'
 
 function GapTile({ label, note }: { label: string; note: string }) {
   return (
@@ -158,6 +159,25 @@ export function AccountDetail() {
       contracts: trades.reduce((s, t) => s + toNumber(t.size), 0),
     }
   }, [trades])
+
+  const todayLoss = useMemo(() => {
+    if (!daily.data) return 0
+    const today = dateOnlyKey(new Date().toISOString())
+    const row = daily.data.find((r) => dateOnlyKey(r.day) === today)
+    if (!row) return 0
+    const pnl = toNumber(row.pnl_net)
+    return pnl < 0 ? Math.abs(pnl) : 0
+  }, [daily.data])
+
+  const drawdown = useMemo(() => {
+    if (!highLow || !account) return 0
+    return Math.max(0, toNumber(account.capital_base) - highLow.low)
+  }, [highLow, account])
+
+  const profitSoFar = useMemo(() => {
+    if (!balance.data || !account) return 0
+    return toNumber(balance.data.current_balance) - toNumber(account.capital_base)
+  }, [balance.data, account])
 
   const totalApprovedPayouts = useMemo(
     () =>
@@ -298,11 +318,12 @@ export function AccountDetail() {
       {isFunded && (
         <div>
           <h2 className="text-sm text-text-muted mb-3">Rules</h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <GapTile label="Profit Target" note="No account_rules endpoint yet — not configured." />
-            <GapTile label="Daily Loss Limit" note="No account_rules endpoint yet — not configured." />
-            <GapTile label="Max Loss Limit" note="No account_rules endpoint yet — not configured." />
-          </div>
+          <AccountRulesSection
+            accountId={id}
+            profitSoFar={profitSoFar}
+            todayLoss={todayLoss}
+            drawdown={drawdown}
+          />
         </div>
       )}
 

@@ -14,7 +14,7 @@ import {
   type PortfolioSnapshot,
 } from '../api'
 import { useApi } from '../hooks/useApi'
-import { formatDate, formatMoney, formatSignedPct, signClass, signOf, toNumber } from '../lib/format'
+import { formatDate, formatDateUTC, formatMoney, formatSignedPct, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCardSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -134,11 +134,11 @@ function ReturnsRow({ accountId }: { accountId: string }) {
       {!loading && result && (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
-            <div className="text-xs text-text-muted">Start ({formatDate(result.start_date)})</div>
+            <div className="text-xs text-text-muted">Start ({formatDateUTC(result.start_date)})</div>
             <div className="font-mono tabular-nums text-lg text-text-primary">{formatMoney(result.start_value)}</div>
           </div>
           <div>
-            <div className="text-xs text-text-muted">End ({formatDate(result.end_date)})</div>
+            <div className="text-xs text-text-muted">End ({formatDateUTC(result.end_date)})</div>
             <div className="font-mono tabular-nums text-lg text-text-primary">{formatMoney(result.end_value)}</div>
           </div>
           <div>
@@ -383,7 +383,7 @@ export function PortfolioDetail() {
                         <td className="py-2">{pct.toFixed(1)}%</td>
                         <td className="py-2 text-text-muted">—</td>
                         <td className="py-2 text-text-muted">—</td>
-                        <td className="py-2">{formatDate(h.acquired_date)}</td>
+                        <td className="py-2">{formatDateUTC(h.acquired_date)}</td>
                         <td className="py-2 font-sans">
                           {isEditing ? (
                             <Button
@@ -462,7 +462,7 @@ export function PortfolioDetail() {
                   .sort((a, b) => b.snapshot_date.localeCompare(a.snapshot_date))
                   .map((s) => (
                     <tr key={s.id} className="border-b border-border last:border-0">
-                      <td className="py-2">{formatDate(s.snapshot_date)}</td>
+                      <td className="py-2">{formatDateUTC(s.snapshot_date)}</td>
                       <td className="py-2">{formatMoney(s.total_value)}</td>
                     </tr>
                   ))}

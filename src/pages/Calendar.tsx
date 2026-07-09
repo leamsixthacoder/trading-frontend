@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { getAccountPnlDaily, getPortfolioPnlDaily, listAccounts, type PnlByDay, type PortfolioPnlByDay } from '../api'
 import { useApi } from '../hooks/useApi'
 import { monthLabel, toKey } from '../lib/calendar'
-import { formatMoney, signClass, signOf, toNumber } from '../lib/format'
+import { dateOnlyKey, formatMoney, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { ChartSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -47,7 +47,7 @@ export function Calendar() {
   const dataByDay = useMemo(() => {
     const map: Record<string, DayPnl> = {}
     for (const row of pnl.data ?? []) {
-      const key = 'day' in row ? row.day : ''
+      const key = 'day' in row ? dateOnlyKey(row.day) : ''
       map[key] = { pnl: toNumber(row.pnl_net), trades: row.trade_count }
     }
     return map

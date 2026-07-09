@@ -13,7 +13,7 @@ import {
   type StrategyValidation,
 } from '../api'
 import { useApi } from '../hooks/useApi'
-import { formatDate, formatMoney, formatPct, signClass, signOf } from '../lib/format'
+import { formatDate, formatDateUTC, formatMoney, formatPct, signClass, signOf } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCardSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
@@ -280,7 +280,7 @@ export function StrategyDetail() {
                   return (
                     <tr key={b.id} className="border-b border-border last:border-0 align-top">
                       <td className="py-2 whitespace-nowrap">
-                        {formatDate(b.period_start)} → {formatDate(b.period_end)}
+                        {formatDateUTC(b.period_start)} → {formatDateUTC(b.period_end)}
                       </td>
                       <td className="py-2 font-sans">{b.data_source}</td>
                       <td className="py-2">{b.total_trades}</td>

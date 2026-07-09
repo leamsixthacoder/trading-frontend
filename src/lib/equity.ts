@@ -1,5 +1,5 @@
 import type { PnlByDay } from '../api'
-import { toNumber } from './format'
+import { dateOnlyKey, toNumber } from './format'
 import type { ChartPoint } from '../components/charts/LineAreaChart'
 
 export function cumulativeBalanceSeries(rows: PnlByDay[], capitalBase: number): ChartPoint[] {
@@ -7,7 +7,7 @@ export function cumulativeBalanceSeries(rows: PnlByDay[], capitalBase: number): 
   let running = capitalBase
   return sorted.map((r) => {
     running += toNumber(r.pnl_net)
-    return { time: r.day, value: running }
+    return { time: dateOnlyKey(r.day), value: running }
   })
 }
 
@@ -16,7 +16,7 @@ export function cumulativePnlSeries(rows: PnlByDay[]): ChartPoint[] {
   let running = 0
   return sorted.map((r) => {
     running += toNumber(r.pnl_net)
-    return { time: r.day, value: running }
+    return { time: dateOnlyKey(r.day), value: running }
   })
 }
 

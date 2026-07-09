@@ -67,6 +67,33 @@ export function formatDate(value: string | null | undefined): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
+// Backend DATE columns (day, acquired_date, snapshot_date, entry_date, period_start/end)
+// serialize as "YYYY-MM-DD..." — a pure calendar date, not an instant. Parsing that with
+// `new Date()` and reading local getters (or plain toLocaleDateString) reinterprets UTC
+// midnight in the viewer's timezone, shifting the displayed day back one for any zone
+// behind UTC. Read the Y/M/D directly from the string prefix instead of round-tripping
+// through a local Date so the calendar date never moves.
+export function dateOnlyParts(value: string): { year: number; month: number; day: number } {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  return { year, month, day }
+}
+
+export function dateOnlyKey(value: string): string {
+  return value.slice(0, 10)
+}
+
+export function formatDateUTC(value: string | null | undefined): string {
+  if (!value) return '—'
+  const { year, month, day } = dateOnlyParts(value)
+  if (!year || !month || !day) return value
+  return new Date(Date.UTC(year, month - 1, day)).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  })
+}
+
 export function daysSince(value: string | null | undefined): number | null {
   if (!value) return null
   const d = new Date(value)
@@ -76,8 +103,8 @@ export function daysSince(value: string | null | undefined): number | null {
 }
 
 export function isoWeekKey(dateStr: string): string {
-  const d = new Date(dateStr)
-  const target = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const { year, month, day } = dateOnlyParts(dateStr)
+  const target = new Date(Date.UTC(year, month - 1, day))
   const dayNum = target.getUTCDay() || 7
   target.setUTCDate(target.getUTCDate() + 4 - dayNum)
   const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1))

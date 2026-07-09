@@ -270,6 +270,44 @@ export interface TradeReviewInput {
   what_to_change?: string | null
 }
 
+export type TradeDirection = 'long' | 'short'
+
+export interface Trade {
+  id: string
+  account_id: string
+  import_batch_id: string | null
+  source_platform: string
+  external_trade_id: string
+  symbol: string
+  direction: TradeDirection
+  size: string
+  entry_price: string
+  exit_price: string | null
+  entry_time: string
+  exit_time: string | null
+  fees: string
+  pnl_gross: string | null
+  pnl_net: string
+  tags: string[]
+  notes: string | null
+  created_at: string
+}
+
+export interface TradeInput {
+  account_id: string
+  symbol: string
+  direction: TradeDirection
+  size: number
+  entry_price: number
+  exit_price?: number | null
+  entry_time: string
+  exit_time?: string | null
+  fees?: number
+  pnl_gross?: number | null
+  tags?: string[]
+  notes?: string | null
+}
+
 export interface PnlByDay {
   account_id: string
   day: string
@@ -495,6 +533,14 @@ export function listTradeReviews(): Promise<TradeReview[]> {
 
 export function createTradeReview(review: TradeReviewInput): Promise<TradeReview> {
   return postJson('/trade-reviews', review)
+}
+
+export function createTrade(trade: TradeInput): Promise<Trade> {
+  return postJson('/trades', trade)
+}
+
+export function listTrades(accountId?: string, symbol?: string): Promise<Trade[]> {
+  return getJson(withQuery('/trades', { account_id: accountId, symbol }))
 }
 
 function withQuery(path: string, params: Record<string, string | boolean | undefined>): string {

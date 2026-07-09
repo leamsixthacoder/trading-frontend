@@ -1,14 +1,17 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { PieChart, Pie, Cell, Legend, Tooltip } from 'recharts'
 import {
   getAccountBalance,
   getAccountPnlDaily,
   getPayoutHistory,
   listAccounts,
+  listTrades,
+  type Trade,
 } from '../api'
 import { useApi } from '../hooks/useApi'
 import { cumulativeBalanceSeries, cumulativePnlSeries } from '../lib/equity'
-import { daysSince, formatDate, formatMoney, isoWeekKey, signClass, signOf, toNumber } from '../lib/format'
+import { daysSince, formatDate, formatDateUTC, formatMoney, formatPct, isoWeekKey, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCard } from '../components/ui/StatCard'
 import { StatCardSkeleton } from '../components/ui/Skeleton'
@@ -18,6 +21,7 @@ import { AccountTypeBadge, StatusBadge } from '../components/ui/Badge'
 import { DonutRing } from '../components/ui/DonutRing'
 import { Button } from '../components/ui/form'
 import { LineAreaChart } from '../components/charts/LineAreaChart'
+import { TradeEntryForm } from '../components/TradeEntryForm'
 
 function GapTile({ label, note }: { label: string; note: string }) {
   return (
@@ -40,15 +44,60 @@ function StatTile({ label, value, sign }: { label: string; value: string; sign?:
   )
 }
 
+const MOST_TRADED_PALETTE = ['#5B8DEF', '#F5A623', '#4FC3B0', '#E07BE0', '#8FA6FF', '#D97757']
+
+function MostTradedDonut({ trades }: { trades: Trade[] }) {
+  const data = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const t of trades) counts.set(t.symbol, (counts.get(t.symbol) ?? 0) + 1)
+    return Array.from(counts.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+  }, [trades])
+
+  if (data.length === 0) {
+    return <EmptyState title="No trades yet" description="Log or import a trade to see the symbol breakdown." />
+  }
+
+  return (
+    <div className="flex items-center justify-center">
+      <PieChart width={260} height={220}>
+        <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={MOST_TRADED_PALETTE[i % MOST_TRADED_PALETTE.length]} />
+          ))}
+        </Pie>
+        <Legend />
+        <Tooltip
+          formatter={(value) => `${value} trade${value === 1 ? '' : 's'}`}
+          contentStyle={{ background: 'var(--surface-raised)', border: '1px solid var(--border)' }}
+        />
+      </PieChart>
+    </div>
+  )
+}
+
 export function AccountDetail() {
   const { id = '' } = useParams<{ id: string }>()
   const accounts = useApi(listAccounts, [])
   const balance = useApi(() => getAccountBalance(id), [id])
   const daily = useApi(() => getAccountPnlDaily(id), [id])
   const payouts = useApi(() => getPayoutHistory(id), [id])
+  const tradesApi = useApi(() => listTrades(id), [id])
   const [summaryView, setSummaryView] = useState<'daily' | 'weekly'>('daily')
   const [page, setPage] = useState(0)
   const pageSize = 10
+
+  const [trades, setTrades] = useState<Trade[]>([])
+  useEffect(() => {
+    if (tradesApi.data) setTrades(tradesApi.data)
+  }, [tradesApi.data])
+
+  function handleTradeCreated(trade: Trade) {
+    setTrades((prev) => [trade, ...prev])
+    balance.refetch()
+    daily.refetch()
+  }
 
   const account = useMemo(() => accounts.data?.find((a) => a.id === id), [accounts.data, id])
   const isFunded = account?.account_type.startsWith('funded_') ?? false
@@ -78,6 +127,30 @@ export function AccountDetail() {
     () => (daily.data ? daily.data.reduce((sum, r) => sum + r.trade_count, 0) : 0),
     [daily.data],
   )
+
+  const tradeStats = useMemo(() => {
+    const closed = trades.filter((t) => t.exit_price !== null)
+    if (closed.length === 0) return null
+
+    const pnls = closed.map((t) => toNumber(t.pnl_net))
+    const wins = pnls.filter((p) => p > 0)
+    const losses = pnls.filter((p) => p < 0)
+    const avgWin = wins.length ? wins.reduce((s, v) => s + v, 0) / wins.length : null
+    const avgLoss = losses.length ? losses.reduce((s, v) => s + v, 0) / losses.length : null
+    const grossWins = wins.reduce((s, v) => s + v, 0)
+    const grossLosses = Math.abs(losses.reduce((s, v) => s + v, 0))
+
+    return {
+      winRate: (wins.length / closed.length) * 100,
+      avgWin,
+      avgLoss,
+      bestTrade: Math.max(...pnls),
+      worstTrade: Math.min(...pnls),
+      profitFactor: grossLosses > 0 ? grossWins / grossLosses : null,
+      riskReward: avgWin !== null && avgLoss !== null && avgLoss !== 0 ? avgWin / Math.abs(avgLoss) : null,
+      contracts: trades.reduce((s, t) => s + toNumber(t.size), 0),
+    }
+  }, [trades])
 
   const totalApprovedPayouts = useMemo(
     () =>
@@ -150,6 +223,12 @@ export function AccountDetail() {
         </Button>
       </div>
 
+      {tradesApi.error ? (
+        <ErrorState message="Couldn't load trades — check your connection and retry." onRetry={tradesApi.refetch} />
+      ) : (
+        <TradeEntryForm accountId={id} trades={trades} onCreated={handleTradeCreated} />
+      )}
+
       {/* Stat row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {balance.loading ? (
@@ -168,8 +247,10 @@ export function AccountDetail() {
           </>
         )}
         <Card className="flex items-center gap-4">
-          <DonutRing value={null} label="Win Rate" />
-          <div className="text-xs text-text-muted">Needs trade-level data (not yet exposed by the backend)</div>
+          <DonutRing value={tradeStats ? tradeStats.winRate : null} label="Win Rate" />
+          <div className="text-xs text-text-muted">
+            {tradeStats ? `From ${trades.filter((t) => t.exit_price !== null).length} closed trades` : 'No closed trades yet'}
+          </div>
         </Card>
         <StatCard
           label="Trading Days"
@@ -220,21 +301,57 @@ export function AccountDetail() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-1">
           <div className="text-sm text-text-muted mb-3">Most Traded</div>
-          <EmptyState title="Needs trade-level data" description="No per-trade symbol endpoint yet." />
+          <MostTradedDonut trades={trades} />
         </Card>
         <div className="lg:col-span-2">
           <div className="text-sm text-text-muted mb-3">Statistics</div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-            <GapTile label="Average Win" note="Needs trade-level data" />
-            <GapTile label="Average Loss" note="Needs trade-level data" />
-            <GapTile label="Best Trade" note="Needs trade-level data" />
-            <GapTile label="Worst Trade" note="Needs trade-level data" />
-            <GapTile label="Profit Factor" note="Needs trade-level data" />
-            <GapTile label="Win Ratio" note="Needs trade-level data" />
-            <GapTile label="Risk:Reward" note="Needs trade-level data" />
-            <GapTile label="Highest Realized Profit" note="Needs trade-level data" />
-            <StatTile label="Trades Placed" value={String(tradesPlaced)} />
-            <GapTile label="Contracts" note="Needs trade-level data" />
+            {tradeStats?.avgWin != null ? (
+              <StatTile label="Average Win" value={formatMoney(tradeStats.avgWin)} sign="positive" />
+            ) : (
+              <GapTile label="Average Win" note="No winning closed trades yet" />
+            )}
+            {tradeStats?.avgLoss != null ? (
+              <StatTile label="Average Loss" value={formatMoney(tradeStats.avgLoss)} sign="negative" />
+            ) : (
+              <GapTile label="Average Loss" note="No losing closed trades yet" />
+            )}
+            {tradeStats ? (
+              <StatTile label="Best Trade" value={formatMoney(tradeStats.bestTrade)} sign={signOf(tradeStats.bestTrade)} />
+            ) : (
+              <GapTile label="Best Trade" note="No closed trades yet" />
+            )}
+            {tradeStats ? (
+              <StatTile label="Worst Trade" value={formatMoney(tradeStats.worstTrade)} sign={signOf(tradeStats.worstTrade)} />
+            ) : (
+              <GapTile label="Worst Trade" note="No closed trades yet" />
+            )}
+            {tradeStats?.profitFactor != null ? (
+              <StatTile label="Profit Factor" value={tradeStats.profitFactor.toFixed(2)} />
+            ) : (
+              <GapTile label="Profit Factor" note="No losing closed trades yet" />
+            )}
+            {tradeStats ? (
+              <StatTile label="Win Ratio" value={formatPct(tradeStats.winRate)} />
+            ) : (
+              <GapTile label="Win Ratio" note="No closed trades yet" />
+            )}
+            {tradeStats?.riskReward != null ? (
+              <StatTile label="Risk:Reward" value={`${tradeStats.riskReward.toFixed(2)}:1`} />
+            ) : (
+              <GapTile label="Risk:Reward" note="Needs both win and loss trades" />
+            )}
+            {tradeStats ? (
+              <StatTile label="Highest Realized Profit" value={formatMoney(tradeStats.bestTrade)} sign={signOf(tradeStats.bestTrade)} />
+            ) : (
+              <GapTile label="Highest Realized Profit" note="No closed trades yet" />
+            )}
+            <StatTile label="Trades Placed" value={String(tradesPlaced || trades.length)} />
+            {tradeStats ? (
+              <StatTile label="Contracts" value={tradeStats.contracts.toLocaleString()} />
+            ) : (
+              <GapTile label="Contracts" note="No trades logged yet" />
+            )}
             <StatTile
               label="Total Approved Payouts"
               value={payouts.loading ? '…' : formatMoney(totalApprovedPayouts)}
@@ -285,7 +402,7 @@ export function AccountDetail() {
                   {summaryView === 'daily'
                     ? (pageRows as typeof dailyRowsSorted).map((r) => (
                         <tr key={r.day} className="border-b border-border last:border-0">
-                          <td className="py-2">{formatDate(r.day)}</td>
+                          <td className="py-2">{formatDateUTC(r.day)}</td>
                           <td className={`py-2 ${signClass[signOf(r.pnl_net)]}`}>{formatMoney(r.pnl_net)}</td>
                           <td className="py-2">{r.trade_count}</td>
                         </tr>

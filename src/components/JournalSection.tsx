@@ -7,7 +7,7 @@ import {
 import { EmptyState } from './ui/EmptyState'
 import { ErrorState } from './ui/ErrorState'
 import { Button, Input, Select } from './ui/form'
-import { formatDate } from '../lib/format'
+import { formatDateUTC } from '../lib/format'
 
 interface Props {
   entries: JournalEntry[]
@@ -79,7 +79,7 @@ export function JournalSection({ entries, onCreated }: Props) {
             <tbody>
               {entries.map((entry) => (
                 <tr key={entry.id} className="border-b border-border last:border-0">
-                  <td className="py-2 font-mono tabular-nums whitespace-nowrap">{formatDate(entry.entry_date)}</td>
+                  <td className="py-2 font-mono tabular-nums whitespace-nowrap">{formatDateUTC(entry.entry_date)}</td>
                   <td className="py-2 text-text-muted">{entry.entry_type.replace('_', ' ')}</td>
                   <td className="py-2">{entry.content}</td>
                 </tr>

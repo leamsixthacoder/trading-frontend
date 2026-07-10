@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import {
   checkPayoutEligibility,
   createPayoutRule,
+  deletePayoutRule,
+  updatePayoutRule,
   type Account,
   type PayoutEligibility,
   type PayoutRule,
@@ -15,9 +17,11 @@ interface Props {
   accounts: Account[]
   rules: PayoutRule[]
   onRuleCreated: (rule: PayoutRule) => void
+  onRuleUpdated: (rule: PayoutRule) => void
+  onRuleDeleted: (ruleId: string) => void
 }
 
-export function PayoutsSection({ accounts, rules, onRuleCreated }: Props) {
+export function PayoutsSection({ accounts, rules, onRuleCreated, onRuleUpdated, onRuleDeleted }: Props) {
   const [accountType, setAccountType] = useState('funded_lucid')
   const [splitPct, setSplitPct] = useState('0.90')
   const [minAmount, setMinAmount] = useState('')
@@ -26,6 +30,55 @@ export function PayoutsSection({ accounts, rules, onRuleCreated }: Props) {
 
   const [results, setResults] = useState<Record<string, PayoutEligibility>>({})
   const [checkError, setCheckError] = useState<Record<string, string>>({})
+
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editSplitPct, setEditSplitPct] = useState('')
+  const [editMinAmount, setEditMinAmount] = useState('')
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
+  const [rowError, setRowError] = useState<string | null>(null)
+
+  function startEdit(rule: PayoutRule) {
+    setEditingId(rule.id)
+    setEditSplitPct(rule.profit_split_pct)
+    setEditMinAmount(rule.min_payout_amount ?? '')
+    setRowError(null)
+  }
+
+  async function handleSaveEdit(rule: PayoutRule) {
+    const pct = Number(editSplitPct)
+    if (!editSplitPct || Number.isNaN(pct) || pct <= 0) return
+    setRowBusy(rule.id)
+    setRowError(null)
+    try {
+      const updated = await updatePayoutRule(rule.id, {
+        profit_split_pct: pct,
+        min_payout_amount: editMinAmount ? Number(editMinAmount) : null,
+        payout_frequency: rule.payout_frequency,
+        notes: rule.notes,
+        effective_date: rule.effective_date,
+      })
+      onRuleUpdated(updated)
+      setEditingId(null)
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : 'Failed to save')
+    } finally {
+      setRowBusy(null)
+    }
+  }
+
+  async function handleDelete(ruleId: string) {
+    if (!window.confirm('Remove this payout rule?')) return
+    setRowBusy(ruleId)
+    setRowError(null)
+    try {
+      await deletePayoutRule(ruleId)
+      onRuleDeleted(ruleId)
+    } catch (e) {
+      setRowError(e instanceof Error ? e.message : 'Failed to remove')
+    } finally {
+      setRowBusy(null)
+    }
+  }
 
   async function handleCreateRule(e: FormEvent) {
     e.preventDefault()
@@ -103,18 +156,83 @@ export function PayoutsSection({ accounts, rules, onRuleCreated }: Props) {
                   <th className="py-2 font-normal">Account type</th>
                   <th className="py-2 font-normal">Split %</th>
                   <th className="py-2 font-normal">Min payout</th>
+                  <th className="py-2 font-normal">Actions</th>
                 </tr>
               </thead>
               <tbody className="font-mono tabular-nums">
                 {rules.map((r) => (
                   <tr key={r.id} className="border-b border-border last:border-0">
                     <td className="py-2 font-sans">{r.account_type}</td>
-                    <td className="py-2">{formatPct(Number(r.profit_split_pct) * 100)}</td>
-                    <td className="py-2">{r.min_payout_amount ? formatMoney(r.min_payout_amount) : '—'}</td>
+                    {editingId === r.id ? (
+                      <>
+                        <td className="py-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={editSplitPct}
+                            onChange={(e) => setEditSplitPct(e.target.value)}
+                            className="w-24"
+                            autoFocus
+                          />
+                        </td>
+                        <td className="py-2">
+                          <Input
+                            type="number"
+                            value={editMinAmount}
+                            onChange={(e) => setEditMinAmount(e.target.value)}
+                            className="w-28"
+                          />
+                        </td>
+                        <td className="py-2 font-sans">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => handleSaveEdit(r)}
+                              disabled={rowBusy === r.id}
+                              className="text-xs text-accent-violet hover:underline disabled:opacity-50"
+                            >
+                              {rowBusy === r.id ? 'Saving…' : 'Save'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="text-xs text-text-muted hover:underline"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="py-2">{formatPct(Number(r.profit_split_pct) * 100)}</td>
+                        <td className="py-2">{r.min_payout_amount ? formatMoney(r.min_payout_amount) : '—'}</td>
+                        <td className="py-2 font-sans">
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() => startEdit(r)}
+                              className="text-xs text-accent-violet hover:underline"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(r.id)}
+                              disabled={rowBusy === r.id}
+                              className="text-xs text-accent-red hover:underline disabled:opacity-50"
+                            >
+                              {rowBusy === r.id ? 'Removing…' : 'Remove'}
+                            </button>
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>
             </table>
+            {rowError && <ErrorState message={rowError} />}
           </div>
         )}
       </div>

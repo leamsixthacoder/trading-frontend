@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import {
   createAccountRule,
+  deleteAccountRule,
   listAccountRules,
   updateAccountRule,
   type AccountRule,
@@ -48,13 +49,15 @@ interface RuleCardProps {
   current: { profitSoFar: number; todayLoss: number; drawdown: number }
   onCreated: (rule: AccountRule) => void
   onUpdated: (rule: AccountRule) => void
+  onDeleted: (ruleType: AccountRuleType) => void
 }
 
-function RuleCard({ accountId, ruleType, rule, current, onCreated, onUpdated }: RuleCardProps) {
+function RuleCard({ accountId, ruleType, rule, current, onCreated, onUpdated, onDeleted }: RuleCardProps) {
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(rule?.threshold ?? '')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     setValue(rule?.threshold ?? '')
@@ -82,6 +85,21 @@ function RuleCard({ accountId, ruleType, rule, current, onCreated, onUpdated }: 
     }
   }
 
+  async function handleDelete() {
+    if (!rule) return
+    if (!window.confirm(`Remove the ${RULE_LABELS[ruleType]} rule?`)) return
+    setDeleting(true)
+    setError(null)
+    try {
+      await deleteAccountRule(accountId, rule.id)
+      onDeleted(ruleType)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   if (!rule || editing) {
     return (
       <Card>
@@ -89,7 +107,7 @@ function RuleCard({ accountId, ruleType, rule, current, onCreated, onUpdated }: 
         <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-2">
           <Input
             type="number"
-            step="any"
+            step="0.01"
             placeholder="$ amount"
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -118,13 +136,23 @@ function RuleCard({ accountId, ruleType, rule, current, onCreated, onUpdated }: 
     <Card>
       <div className="flex items-center justify-between">
         <div className="text-sm text-text-muted">{RULE_LABELS[ruleType]}</div>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="text-xs text-accent-violet hover:underline"
-        >
-          Edit
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-xs text-accent-violet hover:underline"
+          >
+            Edit
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-xs text-accent-red hover:underline disabled:opacity-50"
+          >
+            {deleting ? 'Removing…' : 'Remove'}
+          </button>
+        </div>
       </div>
       <div className={`font-mono tabular-nums text-xl mt-2 ${breached ? (ruleType === 'profit_target' ? 'text-accent-green' : 'text-accent-red') : 'text-text-primary'}`}>
         {formatMoney(amount)} <span className="text-sm text-text-muted">/ {formatMoney(threshold)}</span>
@@ -134,6 +162,7 @@ function RuleCard({ accountId, ruleType, rule, current, onCreated, onUpdated }: 
           {breachLabel}
         </div>
       )}
+      {error && <ErrorState message={error} />}
     </Card>
   )
 }
@@ -169,6 +198,7 @@ export function AccountRulesSection({ accountId, profitSoFar, todayLoss, drawdow
           current={current}
           onCreated={(created) => setRules((prev) => [...prev, created])}
           onUpdated={(updated) => setRules((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))}
+          onDeleted={(deletedType) => setRules((prev) => prev.filter((r) => r.rule_type !== deletedType))}
         />
       ))}
     </div>

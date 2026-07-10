@@ -26,7 +26,7 @@ export function Badge({ children, tone = 'neutral', className = '' }: BadgeProps
   )
 }
 
-const accountTypeLabels: Record<string, string> = {
+export const accountTypeLabels: Record<string, string> = {
   funded_lucid: 'Lucid Flex',
   funded_topstep: 'Topstep',
   personal_live: 'Live',

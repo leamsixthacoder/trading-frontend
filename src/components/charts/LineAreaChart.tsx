@@ -111,30 +111,28 @@ export function LineAreaChart({
     chartRef.current?.timeScale().fitContent()
   }, [data])
 
-  if (loading) return <ChartSkeleton height={height} />
+  const showEmpty = !loading && data.length === 0
 
   return (
     <div className="rounded-xl border border-border bg-surface p-5">
       <div className="text-sm text-text-muted mb-3">{title}</div>
-      {data.length === 0 ? (
-        <EmptyState title="Not enough history yet" description={emptyMessage} />
-      ) : (
-        <div className="relative">
-          <div ref={containerRef} />
-          {tooltip && (
-            <div
-              className="pointer-events-none absolute z-10 rounded-md border border-border bg-surface-raised px-2.5 py-1.5 text-xs shadow-lg"
-              style={{
-                left: Math.min(Math.max(tooltip.x, 60), (containerRef.current?.clientWidth ?? 300) - 60),
-                top: Math.max(tooltip.y - 50, 0),
-              }}
-            >
-              <div className="text-text-muted">{tooltip.time}</div>
-              <div className="font-mono tabular-nums text-text-primary">{formatMoney(tooltip.value)}</div>
-            </div>
-          )}
-        </div>
-      )}
+      {loading && <ChartSkeleton height={height} />}
+      {showEmpty && <EmptyState title="Not enough history yet" description={emptyMessage} />}
+      <div className="relative" style={{ display: loading || showEmpty ? 'none' : 'block' }}>
+        <div ref={containerRef} />
+        {tooltip && (
+          <div
+            className="pointer-events-none absolute z-10 rounded-md border border-border bg-surface-raised px-2.5 py-1.5 text-xs shadow-lg"
+            style={{
+              left: Math.min(Math.max(tooltip.x, 60), (containerRef.current?.clientWidth ?? 300) - 60),
+              top: Math.max(tooltip.y - 50, 0),
+            }}
+          >
+            <div className="text-text-muted">{tooltip.time}</div>
+            <div className="font-mono tabular-nums text-text-primary">{formatMoney(tooltip.value)}</div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

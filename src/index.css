@@ -18,6 +18,19 @@
   --accent-violet: #8b7cf6;
 }
 
+:root[data-theme='light'] {
+  --bg: #f6f8f7;
+  --surface: #ffffff;
+  --surface-raised: #eef2f0;
+  --border: #dbe3df;
+  --text-primary: #101713;
+  --text-muted: #5b6b64;
+  --accent-green: #12703f;
+  --accent-green-dim: #d7f3e3;
+  --accent-red: #c8323c;
+  --accent-violet: #6d4fe0;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);

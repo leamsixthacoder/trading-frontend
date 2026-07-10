@@ -7,6 +7,7 @@ export function LiveAccounts() {
       accountTypes={['personal_live']}
       basePath="/live"
       emptyDescription="Personal live accounts will appear here once seeded on the backend."
+      allowAdd
     />
   )
 }

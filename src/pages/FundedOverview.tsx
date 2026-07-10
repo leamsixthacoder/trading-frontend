@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { listAccounts, listAggregateRiskRules, listPayoutRules, getAggregateRiskStatus } from '../api'
+import { listAccounts, listAggregateRiskRules, listPayoutRules, listRiskRules, getAggregateRiskStatus } from '../api'
 import { useApi } from '../hooks/useApi'
 import { AccountsList } from './AccountsList'
 import { PayoutsSection } from '../components/PayoutsSection'
 import { AggregateRiskSection } from '../components/AggregateRiskSection'
+import { RiskRulesSection } from '../components/RiskRulesSection'
 import { Card } from '../components/ui/Card'
 import { ErrorState } from '../components/ui/ErrorState'
 
@@ -12,6 +13,7 @@ export function FundedOverview() {
   const payoutRules = useApi(listPayoutRules, [])
   const riskStatus = useApi(getAggregateRiskStatus, [])
   const riskRules = useApi(listAggregateRiskRules, [])
+  const accountRiskRules = useApi(() => listRiskRules(), [])
 
   const [rulesState, setRulesState] = useState(payoutRules.data ?? [])
   useEffect(() => {
@@ -23,6 +25,11 @@ export function FundedOverview() {
     if (riskRules.data) setRiskRulesState(riskRules.data)
   }, [riskRules.data])
 
+  const [accountRiskRulesState, setAccountRiskRulesState] = useState(accountRiskRules.data ?? [])
+  useEffect(() => {
+    if (accountRiskRules.data) setAccountRiskRulesState(accountRiskRules.data)
+  }, [accountRiskRules.data])
+
   const fundedAccounts = (accounts.data ?? []).filter((a) => a.account_type.startsWith('funded_'))
 
   return (
@@ -32,6 +39,7 @@ export function FundedOverview() {
         accountTypes={['funded_lucid', 'funded_topstep']}
         basePath="/funded"
         emptyDescription="Funded and evaluation accounts (Lucid Flex, Topstep) will appear here once seeded on the backend."
+        allowAdd
       />
 
       <Card>
@@ -45,6 +53,8 @@ export function FundedOverview() {
             accounts={fundedAccounts}
             rules={rulesState}
             onRuleCreated={(rule) => setRulesState((prev) => [rule, ...prev])}
+            onRuleUpdated={(rule) => setRulesState((prev) => prev.map((r) => (r.id === rule.id ? rule : r)))}
+            onRuleDeleted={(ruleId) => setRulesState((prev) => prev.filter((r) => r.id !== ruleId))}
           />
         )}
       </Card>
@@ -66,6 +76,25 @@ export function FundedOverview() {
             status={riskStatus.data}
             rules={riskRulesState}
             onRuleCreated={(rule) => setRiskRulesState((prev) => [rule, ...prev])}
+            onRuleUpdated={(rule) => setRiskRulesState((prev) => prev.map((r) => (r.id === rule.id ? rule : r)))}
+            onRuleDeleted={(ruleId) => setRiskRulesState((prev) => prev.filter((r) => r.id !== ruleId))}
+          />
+        )}
+      </Card>
+
+      <Card>
+        {accountRiskRules.error ? (
+          <>
+            <h2 className="text-sm text-text-muted mb-3">Risk Rules</h2>
+            <ErrorState message="Couldn't load risk rules — check your connection and retry." onRetry={accountRiskRules.refetch} />
+          </>
+        ) : (
+          <RiskRulesSection
+            accounts={accounts.data ?? []}
+            rules={accountRiskRulesState}
+            onRuleCreated={(rule) => setAccountRiskRulesState((prev) => [rule, ...prev])}
+            onRuleUpdated={(rule) => setAccountRiskRulesState((prev) => prev.map((r) => (r.id === rule.id ? rule : r)))}
+            onRuleDeleted={(ruleId) => setAccountRiskRulesState((prev) => prev.filter((r) => r.id !== ruleId))}
           />
         )}
       </Card>

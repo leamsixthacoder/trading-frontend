@@ -1,4 +1,5 @@
-import type { Allocation, PnlByDay } from '../api'
+import { useEffect, useState } from 'react'
+import { getAccountPnlDaily, type Account, type Allocation, type PnlByDay } from '../api'
 import { dateOnlyKey, toNumber } from './format'
 import type { ChartPoint } from '../components/charts/LineAreaChart'
 
@@ -78,4 +79,36 @@ export function mergeAggregateBalance(
     })
     return { time: date, value: total }
   })
+}
+
+// Combines each account's own daily P&L into one equity series. Used by
+// any view that shows several accounts together (Dashboard, a group of
+// accounts) rather than a single account's own equity chart.
+export function useAggregateEquity(accounts: Account[] | null) {
+  const [state, setState] = useState<{ loading: boolean; data: ReturnType<typeof mergeAggregateBalance> }>({
+    loading: true,
+    data: [],
+  })
+
+  useEffect(() => {
+    if (!accounts) return
+    let cancelled = false
+    setState((s) => ({ ...s, loading: true }))
+    Promise.all(accounts.map((a) => getAccountPnlDaily(a.id)))
+      .then((results) => {
+        if (cancelled) return
+        const combined = mergeAggregateBalance(
+          accounts.map((a, i) => ({ capitalBase: toNumber(a.capital_base), rows: results[i] })),
+        )
+        setState({ loading: false, data: combined })
+      })
+      .catch(() => {
+        if (!cancelled) setState({ loading: false, data: [] })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [accounts])
+
+  return state
 }

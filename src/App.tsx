@@ -6,8 +6,12 @@ import { LiveAccounts } from './pages/LiveAccounts'
 import { AccountDetail } from './pages/AccountDetail'
 import { Portfolio } from './pages/Portfolio'
 import { PortfolioDetail } from './pages/PortfolioDetail'
+import { Groups } from './pages/Groups'
+import { GroupDetail } from './pages/GroupDetail'
 import { StrategiesList } from './pages/StrategiesList'
 import { StrategyDetail } from './pages/StrategyDetail'
+import { PlansList } from './pages/PlansList'
+import { PlanDetail } from './pages/PlanDetail'
 import { Calendar } from './pages/Calendar'
 import { Wellness } from './pages/Wellness'
 
@@ -22,8 +26,12 @@ function App() {
         <Route path="live/:id" element={<AccountDetail />} />
         <Route path="portfolio" element={<Portfolio />} />
         <Route path="portfolio/:id" element={<PortfolioDetail />} />
+        <Route path="groups" element={<Groups />} />
+        <Route path="groups/:id" element={<GroupDetail />} />
         <Route path="strategies" element={<StrategiesList />} />
         <Route path="strategies/:id" element={<StrategyDetail />} />
+        <Route path="plans" element={<PlansList />} />
+        <Route path="plans/:id" element={<PlanDetail />} />
         <Route path="calendar" element={<Calendar />} />
         <Route path="wellness" element={<Wellness />} />
       </Route>

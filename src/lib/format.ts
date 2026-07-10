@@ -19,6 +19,20 @@ export function toNumber(value: string | number | null | undefined): number {
   return typeof value === 'number' ? value : Number(value)
 }
 
+// Backend NUMERIC columns round-trip as fixed-precision strings (e.g. size "1.0000"),
+// which is too noisy to show in a form field. Round to maxDecimals and strip trailing
+// zeros — the result stays a plain decimal string, safe to feed back into
+// <input type="number">.
+export function trimDecimals(value: string | number | null | undefined, maxDecimals = 2): string {
+  if (value === null || value === undefined || value === '') return ''
+  const n = typeof value === 'number' ? value : Number(value)
+  if (Number.isNaN(n)) return ''
+  const fixed = n.toFixed(maxDecimals)
+  if (!fixed.includes('.')) return fixed
+  const trimmed = fixed.replace(/0+$/, '')
+  return trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed
+}
+
 export function signOf(value: string | number | null | undefined): Sign {
   const n = toNumber(value)
   if (n > 0) return 'positive'

@@ -29,7 +29,7 @@ export function DayPanel({ dateKey, data, accountId, onClose }: DayPanelProps) {
         aria-modal="true"
         aria-label={`Trades on ${dateKey}`}
         onClick={(e) => e.stopPropagation()}
-        className="h-full w-full max-w-sm border-l border-border bg-surface p-5 overflow-y-auto"
+        className="h-full w-full max-w-2xl border-l border-border bg-surface p-6 overflow-y-auto"
       >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-medium text-text-primary">{dateKey}</h2>

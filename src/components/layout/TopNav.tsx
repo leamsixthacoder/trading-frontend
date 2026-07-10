@@ -1,16 +1,20 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { listAccounts } from '../../api'
-import { useApi } from '../../hooks/useApi'
+import { useAccounts } from '../../context/AccountsContext'
+import { useTheme } from '../../context/ThemeContext'
 import {
   CalendarIcon,
   ChevronDownIcon,
   DashboardIcon,
   FundedIcon,
   GearIcon,
+  GroupsIcon,
   LiveIcon,
+  MoonIcon,
+  PlansIcon,
   PortfolioIcon,
   StrategiesIcon,
+  SunIcon,
   WellnessIcon,
 } from './navIcons'
 
@@ -19,7 +23,9 @@ const navItems = [
   { to: '/portfolio', label: 'Portfolio', icon: PortfolioIcon, end: false },
   { to: '/funded', label: 'Funded & Eval', icon: FundedIcon, end: false },
   { to: '/live', label: 'Live', icon: LiveIcon, end: false },
+  { to: '/groups', label: 'Groups', icon: GroupsIcon, end: false },
   { to: '/strategies', label: 'Strategies', icon: StrategiesIcon, end: false },
+  { to: '/plans', label: 'Plans', icon: PlansIcon, end: false },
   { to: '/calendar', label: 'Calendar', icon: CalendarIcon, end: false },
   { to: '/wellness', label: 'Wellness', icon: WellnessIcon, end: false },
 ]
@@ -33,7 +39,8 @@ function routeFor(accountType: string, accountId: string): string {
 export function TopNav() {
   const navigate = useNavigate()
   const [accountMenuOpen, setAccountMenuOpen] = useState(false)
-  const { data: accounts } = useApi(listAccounts, [])
+  const { accounts } = useAccounts()
+  const { theme, toggle } = useTheme()
 
   return (
     <header className="flex items-center gap-4 border-b border-border bg-surface px-4 py-2.5">
@@ -102,6 +109,16 @@ export function TopNav() {
           </ul>
         )}
       </div>
+
+      <button
+        type="button"
+        onClick={toggle}
+        title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        className="shrink-0 rounded-md border border-border p-2 text-text-muted hover:text-text-primary hover:border-accent-violet"
+      >
+        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
+      </button>
 
       <button
         type="button"

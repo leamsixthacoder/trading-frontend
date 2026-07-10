@@ -1,24 +1,32 @@
 import { useState, type FormEvent } from 'react'
-import { createTrade, type Trade, type TradeDirection } from '../api'
-import { formatDate, formatMoney, signClass, signOf } from '../lib/format'
+import { createTrade, updateTrade, type Trade, type TradeDirection } from '../api'
+import { formatDate, formatMoney, signClass, signOf, trimDecimals } from '../lib/format'
 import { Card } from './ui/Card'
 import { EmptyState } from './ui/EmptyState'
 import { ErrorState } from './ui/ErrorState'
-import { Button, Input, Select } from './ui/form'
+import { Button, Field, Input, Select } from './ui/form'
 import { InstrumentPicker, type InstrumentAssetClass } from './InstrumentPicker'
 
 interface TradeEntryFormProps {
   accountId: string
   trades: Trade[]
   onCreated: (trade: Trade) => void
+  onUpdated: (trade: Trade) => void
 }
 
 function toIso(localDateTime: string): string {
   return new Date(localDateTime).toISOString()
 }
 
-export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormProps) {
+function toLocalInput(iso: string): string {
+  const d = new Date(iso)
+  const offsetMs = d.getTimezoneOffset() * 60000
+  return new Date(d.getTime() - offsetMs).toISOString().slice(0, 16)
+}
+
+export function TradeEntryForm({ accountId, trades, onCreated, onUpdated }: TradeEntryFormProps) {
   const [open, setOpen] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [symbol, setSymbol] = useState('')
   const [assetClass, setAssetClass] = useState<InstrumentAssetClass>('futures')
   const [direction, setDirection] = useState<TradeDirection>('long')
@@ -47,14 +55,36 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
     setNotes('')
   }
 
+  function startEdit(trade: Trade) {
+    setEditingId(trade.id)
+    setSymbol(trade.symbol)
+    setDirection(trade.direction)
+    setSize(trimDecimals(trade.size))
+    setEntryPrice(trimDecimals(trade.entry_price))
+    setExitPrice(trade.exit_price ? trimDecimals(trade.exit_price) : '')
+    setEntryTime(toLocalInput(trade.entry_time))
+    setExitTime(trade.exit_time ? toLocalInput(trade.exit_time) : '')
+    setFees(trimDecimals(trade.fees))
+    setPnlGross(trade.pnl_gross ? trimDecimals(trade.pnl_gross) : '')
+    setTags(trade.tags.join(', '))
+    setNotes(trade.notes ?? '')
+    setError(null)
+    setOpen(true)
+  }
+
+  function cancelForm() {
+    setOpen(false)
+    setEditingId(null)
+    reset()
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     if (!symbol.trim() || !size || !entryPrice || !entryTime) return
     setSubmitting(true)
     setError(null)
     try {
-      const created = await createTrade({
-        account_id: accountId,
+      const payload = {
         symbol: symbol.trim(),
         direction,
         size: Number(size),
@@ -69,11 +99,17 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
           .map((t) => t.trim())
           .filter(Boolean),
         notes: notes || null,
-      })
-      onCreated(created)
-      reset()
+      }
+      if (editingId) {
+        const updated = await updateTrade(editingId, payload)
+        onUpdated(updated)
+      } else {
+        const created = await createTrade({ account_id: accountId, ...payload })
+        onCreated(created)
+      }
+      cancelForm()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to log trade')
+      setError(e instanceof Error ? e.message : editingId ? 'Failed to save trade' : 'Failed to log trade')
     } finally {
       setSubmitting(false)
     }
@@ -82,15 +118,15 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
   return (
     <Card>
       <div className="flex items-center justify-between mb-3">
-        <div className="text-sm text-text-muted">Trades</div>
-        <Button variant="secondary" onClick={() => setOpen((v) => !v)}>
+        <div className="text-sm text-text-muted">{editingId ? 'Editing trade' : 'Trades'}</div>
+        <Button variant="secondary" onClick={() => (open ? cancelForm() : setOpen(true))}>
           {open ? 'Cancel' : 'Log a trade'}
         </Button>
       </div>
 
       {open && (
         <form onSubmit={handleSubmit} className="space-y-3 mb-5">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <InstrumentPicker
               value={symbol}
               onChange={(sym, ac) => {
@@ -98,43 +134,57 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
                 setAssetClass(ac)
               }}
               mode="both"
+              className="w-full"
             />
-            <Select value={direction} onChange={(e) => setDirection(e.target.value as TradeDirection)}>
-              <option value="long">Long</option>
-              <option value="short">Short</option>
-            </Select>
-            <Input
-              type="number"
-              step="any"
-              placeholder="Size / contracts"
-              value={size}
-              onChange={(e) => setSize(e.target.value)}
-              required
-            />
-            <Input
-              type="number"
-              step="any"
-              placeholder="Entry price"
-              value={entryPrice}
-              onChange={(e) => setEntryPrice(e.target.value)}
-              required
-            />
-            <Input
-              type="number"
-              step="any"
-              placeholder="Exit price (optional)"
-              value={exitPrice}
-              onChange={(e) => setExitPrice(e.target.value)}
-            />
-            <Input
-              type="number"
-              step="any"
-              placeholder="Fees"
-              value={fees}
-              onChange={(e) => setFees(e.target.value)}
-            />
-            <div>
-              <div className="text-xs text-text-muted mb-1">Entry time</div>
+            <Field label="Direction" className="w-full">
+              <Select
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as TradeDirection)}
+                className="w-full"
+              >
+                <option value="long">Long</option>
+                <option value="short">Short</option>
+              </Select>
+            </Field>
+            <Field label="Size / contracts" className="w-full">
+              <Input
+                type="number"
+                step="0.01"
+                value={size}
+                onChange={(e) => setSize(e.target.value)}
+                className="w-full"
+                required
+              />
+            </Field>
+            <Field label="Entry price" className="w-full">
+              <Input
+                type="number"
+                step="0.01"
+                value={entryPrice}
+                onChange={(e) => setEntryPrice(e.target.value)}
+                className="w-full"
+                required
+              />
+            </Field>
+            <Field label="Exit price (optional)" className="w-full">
+              <Input
+                type="number"
+                step="0.01"
+                value={exitPrice}
+                onChange={(e) => setExitPrice(e.target.value)}
+                className="w-full"
+              />
+            </Field>
+            <Field label="Fees" className="w-full">
+              <Input
+                type="number"
+                step="0.01"
+                value={fees}
+                onChange={(e) => setFees(e.target.value)}
+                className="w-full"
+              />
+            </Field>
+            <Field label="Entry time" className="w-full">
               <Input
                 type="datetime-local"
                 value={entryTime}
@@ -142,37 +192,40 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
                 required
                 className="w-full"
               />
-            </div>
-            <div>
-              <div className="text-xs text-text-muted mb-1">Exit time (optional)</div>
+            </Field>
+            <Field label="Exit time (optional)" className="w-full">
               <Input
                 type="datetime-local"
                 value={exitTime}
                 onChange={(e) => setExitTime(e.target.value)}
                 className="w-full"
               />
-            </div>
-            <Input
-              type="number"
-              step="any"
-              placeholder="Gross P&L $ (from your broker)"
-              value={pnlGross}
-              onChange={(e) => setPnlGross(e.target.value)}
-            />
-            <Input
-              type="text"
-              placeholder="Tags (comma separated)"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className="sm:col-span-2"
-            />
-            <Input
-              type="text"
-              placeholder="Notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="sm:col-span-3"
-            />
+            </Field>
+            <Field label="Gross P&L $ (from your broker)" className="w-full">
+              <Input
+                type="number"
+                step="0.01"
+                value={pnlGross}
+                onChange={(e) => setPnlGross(e.target.value)}
+                className="w-full"
+              />
+            </Field>
+            <Field label="Tags (comma separated)" className="w-full sm:col-span-2">
+              <Input
+                type="text"
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                className="w-full"
+              />
+            </Field>
+            <Field label="Notes" className="w-full sm:col-span-2 lg:col-span-3">
+              <Input
+                type="text"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                className="w-full"
+              />
+            </Field>
           </div>
           <div className="text-xs text-text-muted">
             Asset class: {assetClass === 'futures' ? 'Futures contract' : 'Stock/ETF'} · Gross P&amp;L isn't
@@ -180,7 +233,7 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
             your platform.
           </div>
           <Button type="submit" disabled={submitting}>
-            {submitting ? 'Logging…' : 'Log trade'}
+            {submitting ? 'Saving…' : editingId ? 'Save changes' : 'Log trade'}
           </Button>
           {error && <ErrorState message={error} />}
         </form>
@@ -200,6 +253,7 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
                 <th className="py-2 font-normal">Entry</th>
                 <th className="py-2 font-normal">Exit</th>
                 <th className="py-2 font-normal">Net P&amp;L</th>
+                <th className="py-2 font-normal">Actions</th>
               </tr>
             </thead>
             <tbody className="font-mono tabular-nums">
@@ -208,10 +262,19 @@ export function TradeEntryForm({ accountId, trades, onCreated }: TradeEntryFormP
                   <td className="py-2">{formatDate(t.entry_time)}</td>
                   <td className="py-2 font-sans">{t.symbol}</td>
                   <td className="py-2 font-sans capitalize">{t.direction}</td>
-                  <td className="py-2">{t.size}</td>
+                  <td className="py-2">{trimDecimals(t.size)}</td>
                   <td className="py-2">{formatMoney(t.entry_price)}</td>
                   <td className="py-2">{t.exit_price ? formatMoney(t.exit_price) : '—'}</td>
                   <td className={`py-2 ${signClass[signOf(t.pnl_net)]}`}>{formatMoney(t.pnl_net)}</td>
+                  <td className="py-2 font-sans">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(t)}
+                      className="text-xs text-accent-violet hover:underline"
+                    >
+                      Edit
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>

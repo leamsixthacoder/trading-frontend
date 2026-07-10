@@ -8,6 +8,7 @@ import {
   listAccountAllocations,
   listAccounts,
   listTrades,
+  type Allocation,
   type Trade,
 } from '../api'
 import { useApi } from '../hooks/useApi'
@@ -25,6 +26,7 @@ import { LineAreaChart } from '../components/charts/LineAreaChart'
 import { TradeEntryForm } from '../components/TradeEntryForm'
 import { CsvImportSection } from '../components/CsvImportSection'
 import { AccountRulesSection } from '../components/AccountRulesSection'
+import { AllocationsSection } from '../components/AllocationsSection'
 
 function GapTile({ label, note }: { label: string; note: string }) {
   return (
@@ -97,8 +99,26 @@ export function AccountDetail() {
     if (tradesApi.data) setTrades(tradesApi.data)
   }, [tradesApi.data])
 
+  const [allocationsList, setAllocationsList] = useState<Allocation[]>([])
+  useEffect(() => {
+    if (allocations.data) setAllocationsList(allocations.data)
+  }, [allocations.data])
+
   function handleTradeCreated(trade: Trade) {
     setTrades((prev) => [trade, ...prev])
+    balance.refetch()
+    daily.refetch()
+  }
+
+  function handleTradeUpdated(trade: Trade) {
+    setTrades((prev) => prev.map((t) => (t.id === trade.id ? trade : t)))
+    balance.refetch()
+    daily.refetch()
+  }
+
+  function handleAllocationCreated(allocation: Allocation) {
+    setAllocationsList((prev) => [allocation, ...prev])
+    allocations.refetch()
     balance.refetch()
     daily.refetch()
   }
@@ -262,7 +282,7 @@ export function AccountDetail() {
       {tradesApi.error ? (
         <ErrorState message="Couldn't load trades — check your connection and retry." onRetry={tradesApi.refetch} />
       ) : (
-        <TradeEntryForm accountId={id} trades={trades} onCreated={handleTradeCreated} />
+        <TradeEntryForm accountId={id} trades={trades} onCreated={handleTradeCreated} onUpdated={handleTradeUpdated} />
       )}
 
       <CsvImportSection accountId={id} onImported={handleImported} />
@@ -335,6 +355,11 @@ export function AccountDetail() {
           />
         </div>
       )}
+
+      {/* Allocations */}
+      <Card>
+        <AllocationsSection accountId={id} allocations={allocationsList} onCreated={handleAllocationCreated} />
+      </Card>
 
       {/* Most traded + Statistics grid */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">

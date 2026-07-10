@@ -11,6 +11,12 @@ export interface Account {
   closed_at: string | null
 }
 
+export interface AccountInput {
+  label: string
+  account_type: string
+  capital_base: number
+}
+
 export interface AccountBalance {
   account_id: string
   label: string
@@ -212,6 +218,27 @@ export interface PortfolioSnapshotInput {
   holdings_detail?: Record<string, unknown>
 }
 
+export interface RiskRule {
+  id: string
+  account_id: string | null
+  rule_type: string
+  threshold: string
+  active: boolean
+  created_at: string
+}
+
+export interface RiskRuleInput {
+  account_id?: string | null
+  rule_type: string
+  threshold: number
+  active?: boolean
+}
+
+export interface RiskRuleUpdateInput {
+  threshold: number
+  active: boolean
+}
+
 export interface PayoutRule {
   id: string
   account_type: string
@@ -228,6 +255,14 @@ export interface PayoutRuleInput {
   min_payout_amount?: number | null
   payout_frequency?: string | null
   notes?: string | null
+}
+
+export interface PayoutRuleUpdateInput {
+  profit_split_pct: number
+  min_payout_amount?: number | null
+  payout_frequency?: string | null
+  notes?: string | null
+  effective_date?: string | null
 }
 
 export interface PayoutEligibility {
@@ -251,6 +286,11 @@ export interface AggregateRiskRuleInput {
   rule_type: string
   scope: string
   threshold: number
+}
+
+export interface AggregateRiskRuleUpdateInput {
+  threshold: number
+  active: boolean
 }
 
 export interface AggregateRiskBreach {
@@ -324,6 +364,20 @@ export interface Trade {
 
 export interface TradeInput {
   account_id: string
+  symbol: string
+  direction: TradeDirection
+  size: number
+  entry_price: number
+  exit_price?: number | null
+  entry_time: string
+  exit_time?: string | null
+  fees?: number
+  pnl_gross?: number | null
+  tags?: string[]
+  notes?: string | null
+}
+
+export interface TradeUpdateInput {
   symbol: string
   direction: TradeDirection
   size: number
@@ -422,6 +476,14 @@ export interface Allocation {
   created_by: string
 }
 
+export interface AllocationInput {
+  type: string
+  amount: number
+  period_start?: string | null
+  period_end?: string | null
+  memo?: string | null
+}
+
 export interface AccountStatusHistoryEntry {
   old_status: string | null
   new_status: string
@@ -472,10 +534,34 @@ export interface PortfolioReturn {
   return_pct: number
 }
 
+export interface AccountGroup {
+  id: string
+  name: string
+  created_at: string
+}
+
+export interface AccountGroupInput {
+  name: string
+}
+
+export interface AccountGroupMember {
+  group_id: string
+  account_id: string
+  added_at: string
+}
+
+async function errorFromResponse(path: string, res: Response): Promise<Error> {
+  const detail = await res
+    .json()
+    .then((d: { detail?: unknown }) => d.detail)
+    .catch(() => null)
+  return new Error(typeof detail === 'string' ? detail : `${path} failed: ${res.status}`)
+}
+
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(`${API_URL}${path}`)
   if (!res.ok) {
-    throw new Error(`${path} failed: ${res.status}`)
+    throw await errorFromResponse(path, res)
   }
   return res.json() as Promise<T>
 }
@@ -487,7 +573,7 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error(`${path} failed: ${res.status}`)
+    throw await errorFromResponse(path, res)
   }
   return res.json() as Promise<T>
 }
@@ -499,25 +585,72 @@ async function patchJson<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   })
   if (!res.ok) {
-    throw new Error(`${path} failed: ${res.status}`)
+    throw await errorFromResponse(path, res)
   }
   return res.json() as Promise<T>
+}
+
+async function putJson<T>(path: string, body: unknown): Promise<T> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    throw await errorFromResponse(path, res)
+  }
+  return res.json() as Promise<T>
+}
+
+async function deleteJson(path: string): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, { method: 'DELETE' })
+  if (!res.ok) {
+    throw await errorFromResponse(path, res)
+  }
 }
 
 async function postForm<T>(path: string, form: FormData): Promise<T> {
   const res = await fetch(`${API_URL}${path}`, { method: 'POST', body: form })
   if (!res.ok) {
-    const detail = await res
-      .json()
-      .then((d: { detail?: unknown }) => d.detail)
-      .catch(() => null)
-    throw new Error(typeof detail === 'string' ? detail : `${path} failed: ${res.status}`)
+    throw await errorFromResponse(path, res)
   }
   return res.json() as Promise<T>
 }
 
 export function listAccounts(): Promise<Account[]> {
   return getJson('/accounts')
+}
+
+export function createAccount(input: AccountInput): Promise<Account> {
+  return postJson('/accounts', input)
+}
+
+export function listAccountGroups(): Promise<AccountGroup[]> {
+  return getJson('/account-groups')
+}
+
+export function createAccountGroup(input: AccountGroupInput): Promise<AccountGroup> {
+  return postJson('/account-groups', input)
+}
+
+export function updateAccountGroup(groupId: string, input: AccountGroupInput): Promise<AccountGroup> {
+  return patchJson(`/account-groups/${groupId}`, input)
+}
+
+export function deleteAccountGroup(groupId: string): Promise<void> {
+  return deleteJson(`/account-groups/${groupId}`)
+}
+
+export function listGroupAccounts(groupId: string): Promise<Account[]> {
+  return getJson(`/account-groups/${groupId}/accounts`)
+}
+
+export function addGroupMember(groupId: string, accountId: string): Promise<AccountGroupMember> {
+  return postJson(`/account-groups/${groupId}/accounts`, { account_id: accountId })
+}
+
+export function removeGroupMember(groupId: string, accountId: string): Promise<void> {
+  return deleteJson(`/account-groups/${groupId}/accounts/${accountId}`)
 }
 
 export function getAccountBalance(accountId: string): Promise<AccountBalance> {
@@ -621,8 +754,32 @@ export function createPayoutRule(rule: PayoutRuleInput): Promise<PayoutRule> {
   return postJson('/payout-rules', rule)
 }
 
+export function updatePayoutRule(ruleId: string, rule: PayoutRuleUpdateInput): Promise<PayoutRule> {
+  return patchJson(`/payout-rules/${ruleId}`, rule)
+}
+
+export function deletePayoutRule(ruleId: string): Promise<void> {
+  return deleteJson(`/payout-rules/${ruleId}`)
+}
+
 export function checkPayoutEligibility(accountId: string): Promise<PayoutEligibility> {
   return getJson(`/accounts/${accountId}/payout-eligibility`)
+}
+
+export function listRiskRules(accountId?: string): Promise<RiskRule[]> {
+  return getJson(withQuery('/risk-rules', { account_id: accountId }))
+}
+
+export function createRiskRule(rule: RiskRuleInput): Promise<RiskRule> {
+  return postJson('/risk-rules', rule)
+}
+
+export function updateRiskRule(ruleId: string, rule: RiskRuleUpdateInput): Promise<RiskRule> {
+  return patchJson(`/risk-rules/${ruleId}`, rule)
+}
+
+export function deleteRiskRule(ruleId: string): Promise<void> {
+  return deleteJson(`/risk-rules/${ruleId}`)
 }
 
 export function listAggregateRiskRules(): Promise<AggregateRiskRule[]> {
@@ -631,6 +788,14 @@ export function listAggregateRiskRules(): Promise<AggregateRiskRule[]> {
 
 export function createAggregateRiskRule(rule: AggregateRiskRuleInput): Promise<AggregateRiskRule> {
   return postJson('/aggregate-risk-rules', rule)
+}
+
+export function updateAggregateRiskRule(ruleId: string, rule: AggregateRiskRuleUpdateInput): Promise<AggregateRiskRule> {
+  return patchJson(`/aggregate-risk-rules/${ruleId}`, rule)
+}
+
+export function deleteAggregateRiskRule(ruleId: string): Promise<void> {
+  return deleteJson(`/aggregate-risk-rules/${ruleId}`)
 }
 
 export function getAggregateRiskStatus(): Promise<AggregateRiskStatus> {
@@ -655,6 +820,10 @@ export function createTradeReview(review: TradeReviewInput): Promise<TradeReview
 
 export function createTrade(trade: TradeInput): Promise<Trade> {
   return postJson('/trades', trade)
+}
+
+export function updateTrade(tradeId: string, trade: TradeUpdateInput): Promise<Trade> {
+  return patchJson(`/trades/${tradeId}`, trade)
 }
 
 export function listTrades(accountId?: string, symbol?: string, exitDate?: string): Promise<Trade[]> {
@@ -718,6 +887,10 @@ export function listAccountAllocations(accountId: string): Promise<Allocation[]>
   return getJson(`/accounts/${accountId}/allocations`)
 }
 
+export function createAllocation(accountId: string, input: AllocationInput): Promise<Allocation> {
+  return postJson(`/accounts/${accountId}/allocations`, input)
+}
+
 export function getStatusHistory(accountId: string): Promise<AccountStatusHistoryEntry[]> {
   return getJson(`/accounts/${accountId}/status-history`)
 }
@@ -746,7 +919,184 @@ export function updateAccountRule(accountId: string, ruleId: string, threshold: 
   return patchJson(`/accounts/${accountId}/rules/${ruleId}`, { threshold })
 }
 
+export function deleteAccountRule(accountId: string, ruleId: string): Promise<void> {
+  return deleteJson(`/accounts/${accountId}/rules/${ruleId}`)
+}
+
 export function getQuotes(symbols: string[]): Promise<Quote[]> {
   if (symbols.length === 0) return Promise.resolve([])
   return getJson(withQuery('/quotes', { symbols: symbols.join(',') }))
+}
+
+export interface RuleViolation {
+  account_id: string
+  account_label: string
+  rule_type: AccountRuleType
+  threshold: string
+  breached_days: number
+  currently_breached: boolean
+}
+
+export interface RuleViolationsSummary {
+  start: string
+  end: string
+  violations: RuleViolation[]
+  total_breached_days: number
+}
+
+export function getRuleViolations(start: string, end: string): Promise<RuleViolationsSummary> {
+  return getJson(withQuery('/dashboard/rule-violations', { start, end }))
+}
+
+export type TradingPlanStatus = 'active' | 'archived'
+
+export interface TradingPlan {
+  id: string
+  name: string
+  description: string | null
+  account_id: string | null
+  account_group_id: string | null
+  status: TradingPlanStatus
+  created_at: string
+  updated_at: string
+}
+
+export interface TradingPlanInput {
+  name: string
+  description?: string | null
+  account_id?: string | null
+  account_group_id?: string | null
+}
+
+export interface TradingPlanUpdateInput {
+  name?: string
+  description?: string | null
+  status?: TradingPlanStatus
+}
+
+export interface TradingPlanStrategy {
+  plan_id: string
+  strategy_id: string
+  strategy_name: string
+  strategy_status: StrategyStatus
+  added_at: string
+}
+
+export interface ChecklistItem {
+  id: string
+  plan_id: string
+  label: string
+  sort_order: number
+  created_at: string
+}
+
+export interface ChecklistItemInput {
+  label: string
+  sort_order?: number
+}
+
+export interface DailyLogItem {
+  checklist_item_id: string
+  label: string
+  sort_order: number
+  checked: boolean
+  checked_at: string | null
+}
+
+export interface DailyLog {
+  plan_id: string
+  log_date: string
+  notes: string | null
+  items: DailyLogItem[]
+}
+
+export interface DailyLogItemInput {
+  checklist_item_id: string
+  checked: boolean
+}
+
+export interface DailyLogInput {
+  notes?: string | null
+  items: DailyLogItemInput[]
+}
+
+export interface DailyLogSummary {
+  log_date: string
+  notes: string | null
+  total_items: number
+  checked_items: number
+}
+
+export function listTradingPlans(params?: {
+  accountId?: string
+  accountGroupId?: string
+  status?: TradingPlanStatus
+}): Promise<TradingPlan[]> {
+  return getJson(
+    withQuery('/trading-plans', {
+      account_id: params?.accountId,
+      account_group_id: params?.accountGroupId,
+      status: params?.status,
+    }),
+  )
+}
+
+export function getTradingPlan(planId: string): Promise<TradingPlan> {
+  return getJson(`/trading-plans/${planId}`)
+}
+
+export function createTradingPlan(input: TradingPlanInput): Promise<TradingPlan> {
+  return postJson('/trading-plans', input)
+}
+
+export function updateTradingPlan(planId: string, input: TradingPlanUpdateInput): Promise<TradingPlan> {
+  return patchJson(`/trading-plans/${planId}`, input)
+}
+
+export function deleteTradingPlan(planId: string): Promise<void> {
+  return deleteJson(`/trading-plans/${planId}`)
+}
+
+export function listPlanStrategies(planId: string): Promise<TradingPlanStrategy[]> {
+  return getJson(`/trading-plans/${planId}/strategies`)
+}
+
+export function attachPlanStrategy(planId: string, strategyId: string): Promise<TradingPlanStrategy> {
+  return postJson(`/trading-plans/${planId}/strategies`, { strategy_id: strategyId })
+}
+
+export function detachPlanStrategy(planId: string, strategyId: string): Promise<void> {
+  return deleteJson(`/trading-plans/${planId}/strategies/${strategyId}`)
+}
+
+export function listChecklistItems(planId: string): Promise<ChecklistItem[]> {
+  return getJson(`/trading-plans/${planId}/checklist-items`)
+}
+
+export function createChecklistItem(planId: string, input: ChecklistItemInput): Promise<ChecklistItem> {
+  return postJson(`/trading-plans/${planId}/checklist-items`, input)
+}
+
+export function updateChecklistItem(
+  planId: string,
+  itemId: string,
+  input: Partial<ChecklistItemInput>,
+): Promise<ChecklistItem> {
+  return patchJson(`/trading-plans/${planId}/checklist-items/${itemId}`, input)
+}
+
+export function deleteChecklistItem(planId: string, itemId: string): Promise<void> {
+  return deleteJson(`/trading-plans/${planId}/checklist-items/${itemId}`)
+}
+
+export function listDailyLogs(planId: string, start: string, end: string): Promise<DailyLogSummary[]> {
+  return getJson(withQuery(`/trading-plans/${planId}/daily-logs`, { start, end }))
+}
+
+export function getDailyLog(planId: string, logDate: string): Promise<DailyLog> {
+  return getJson(`/trading-plans/${planId}/daily-logs/${logDate}`)
+}
+
+export function upsertDailyLog(planId: string, logDate: string, input: DailyLogInput): Promise<DailyLog> {
+  return putJson(`/trading-plans/${planId}/daily-logs/${logDate}`, input)
 }

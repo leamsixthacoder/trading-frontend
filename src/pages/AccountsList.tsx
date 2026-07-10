@@ -1,24 +1,25 @@
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listAccounts } from '../api'
-import { useApi } from '../hooks/useApi'
+import { useAccounts } from '../context/AccountsContext'
 import { formatMoney } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCardSkeleton } from '../components/ui/Skeleton'
 import { EmptyState } from '../components/ui/EmptyState'
 import { ErrorState } from '../components/ui/ErrorState'
 import { AccountTypeBadge, StatusBadge } from '../components/ui/Badge'
+import { AddAccountForm } from '../components/AddAccountForm'
 
 interface AccountsListProps {
   title: string
   accountTypes: string[]
   basePath: string
   emptyDescription: string
+  allowAdd?: boolean
 }
 
-export function AccountsList({ title, accountTypes, basePath, emptyDescription }: AccountsListProps) {
+export function AccountsList({ title, accountTypes, basePath, emptyDescription, allowAdd }: AccountsListProps) {
   const navigate = useNavigate()
-  const { data, loading, error, refetch } = useApi(listAccounts, [])
+  const { accounts: data, loading, error, refetch } = useAccounts()
 
   const filtered = useMemo(
     () => (data ?? []).filter((a) => accountTypes.includes(a.account_type)),
@@ -27,7 +28,10 @@ export function AccountsList({ title, accountTypes, basePath, emptyDescription }
 
   return (
     <div>
-      <h1 className="text-2xl font-medium text-text-primary mb-4">{title}</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <h1 className="text-2xl font-medium text-text-primary">{title}</h1>
+        {allowAdd && <AddAccountForm allowedTypes={accountTypes} onCreated={() => refetch()} />}
+      </div>
 
       {error && <ErrorState message="Couldn't load accounts — check your connection and retry." onRetry={refetch} />}
 

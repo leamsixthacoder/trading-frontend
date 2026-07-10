@@ -95,6 +95,43 @@ export function GearIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function SunIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="10" cy="10" r="3.5" />
+      <path d="M10 2.5v2M10 15.5v2M17.5 10h-2M4.5 10h-2M15.3 4.7l-1.4 1.4M6.1 13.9l-1.4 1.4M15.3 15.3l-1.4-1.4M6.1 6.1 4.7 4.7" />
+    </Icon>
+  )
+}
+
+export function MoonIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M16.5 12.3A6.8 6.8 0 0 1 7.7 3.5a6.8 6.8 0 1 0 8.8 8.8Z" />
+    </Icon>
+  )
+}
+
+export function GroupsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <circle cx="7" cy="7.5" r="3" />
+      <circle cx="14" cy="12.5" r="3" />
+      <path d="M4.5 16.5c0-1.9 1.5-3.3 3.3-3.3M11.7 9.7c1 .5 1.8 1.5 1.8 2.8" />
+    </Icon>
+  )
+}
+
+export function PlansIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <rect x="4" y="3.5" width="12" height="14" rx="1.5" />
+      <path d="M7.5 2.5h5a1 1 0 0 1 1 1v1.5h-7V3.5a1 1 0 0 1 1-1Z" />
+      <path d="m7 10.5 1.8 1.8L13 8.5" />
+    </Icon>
+  )
+}
+
 export function MenuIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>

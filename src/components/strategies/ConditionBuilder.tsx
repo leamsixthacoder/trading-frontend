@@ -74,7 +74,7 @@ export function ConditionBuilder({ label, datalistId, value, onChange }: Conditi
             </Select>
             <Input
               type="number"
-              step="any"
+              step="0.01"
               placeholder="Value"
               value={c.value}
               onChange={(e) => updateCondition(i, { value: Number(e.target.value) })}

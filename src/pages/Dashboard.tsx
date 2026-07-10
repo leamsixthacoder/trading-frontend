@@ -2,16 +2,14 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   acknowledgeRiskAlert,
-  getAccountPnlDaily,
   getDashboardSummary,
   getSetupPerformance,
   listAccounts,
   listRiskAlerts,
   listJournalEntries,
-  type Account,
 } from '../api'
 import { useApi } from '../hooks/useApi'
-import { mergeAggregateBalance } from '../lib/equity'
+import { useAggregateEquity } from '../lib/equity'
 import { formatDate, formatMoney, formatSigned, signClass, signOf, toNumber } from '../lib/format'
 import { Card } from '../components/ui/Card'
 import { StatCard } from '../components/ui/StatCard'
@@ -23,40 +21,12 @@ import { Button } from '../components/ui/form'
 import { LineAreaChart } from '../components/charts/LineAreaChart'
 import { JournalSection } from '../components/JournalSection'
 import { SetupPerformance } from '../components/SetupPerformance'
+import { RuleViolationsSection } from '../components/RuleViolationsSection'
 
 function routeFor(accountType: string, accountId: string): string {
   if (accountType === 'personal_live') return `/live/${accountId}`
   if (accountType === 'personal_portfolio') return `/portfolio/${accountId}`
   return `/funded/${accountId}`
-}
-
-function useAggregateEquity(accounts: Account[] | null) {
-  const [state, setState] = useState<{ loading: boolean; data: ReturnType<typeof mergeAggregateBalance> }>({
-    loading: true,
-    data: [],
-  })
-
-  useEffect(() => {
-    if (!accounts) return
-    let cancelled = false
-    setState((s) => ({ ...s, loading: true }))
-    Promise.all(accounts.map((a) => getAccountPnlDaily(a.id)))
-      .then((results) => {
-        if (cancelled) return
-        const combined = mergeAggregateBalance(
-          accounts.map((a, i) => ({ capitalBase: toNumber(a.capital_base), rows: results[i] })),
-        )
-        setState({ loading: false, data: combined })
-      })
-      .catch(() => {
-        if (!cancelled) setState({ loading: false, data: [] })
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [accounts])
-
-  return state
 }
 
 export function Dashboard() {
@@ -175,6 +145,8 @@ export function Dashboard() {
         loading={equity.loading || accountsApi.loading}
         emptyMessage="Combined balance history appears here once accounts have closed trades."
       />
+
+      <RuleViolationsSection />
 
       <Card>
         <h2 className="text-sm text-text-muted mb-3">Recent Risk Alerts</h2>
